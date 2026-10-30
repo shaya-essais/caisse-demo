@@ -48,6 +48,9 @@
 .bandeau-demo{position:sticky;top:0;z-index:2000;background:#f5a623;color:#1a1a1a;font-weight:700;font-size:14px;
   padding:8px 12px;text-align:center;line-height:1.4}
 .bandeau-demo .btn-sm{margin-left:10px;background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+/* Démonstration : les panneaux latéraux commencent sous le bandeau (une ou deux lignes selon la largeur), sinon
+   il cache leur bouton de fermeture. Hauteur mesurée par le script qui affiche le bandeau. */
+body.mode-demo :is(.stock-panel,.promo-panel,.flash-panel,.caisse-panel,.autres-panel,.dons-panel,.ticket-list,.excel-panel){top:var(--hauteur-bandeau,0px)}
 body.mode-demo .topbar{box-shadow:inset 0 -4px 0 #f5a623}
 :root{
   --bg:#0d0d0f;--surface:#18181c;--surface2:#222228;--surface3:#2c2c35;
@@ -411,6 +414,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .product-card.out-of-stock .stock-badge{display:none}
 /* « ÉPUISÉ » en pastille dans le coin (à la place du stock) : le nom et le prix restent lisibles. */
 .product-card.out-of-stock::after{inset:auto;top:5px;right:5px;padding:2px 7px;font-size:10px;line-height:1.4;border-radius:99px;background:rgba(233,69,96,.25)}
+/* Stock et panier : barre des produits épuisés, saisie directe du stock, plafond du panier, contrôle avant
+   encaissement. */
+.epuises-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 14px 6px;font-size:12px;color:var(--text2);flex-shrink:0}
+.epuises-bar[hidden]{display:none}
+.epuises-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:99px;padding:5px 12px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap}
+.products-vide{grid-column:1/-1;text-align:center;color:var(--text3);font-size:13px;padding:24px 8px}
+.qty-btn:disabled,.sp-qty-btn:disabled{opacity:.3;cursor:not-allowed}
+.qty-btn:disabled:active,.sp-qty-btn:disabled:active{transform:none;background:var(--surface3);border-color:var(--border2)}
+.cart-item.cart-item-alerte{border-color:rgba(233,69,96,.6);background:rgba(233,69,96,.08)}
+.cart-item-alerte-txt{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:3px;font-size:11px;font-weight:600;color:#e94560}
+.cart-ajuster{background:#e94560;border:none;color:#fff;border-radius:99px;padding:3px 10px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.sp-qty-input{width:48px;padding:4px 2px;border:1px solid var(--border2);border-radius:8px;background:var(--surface3);font-family:'DM Mono',monospace;font-size:14px;font-weight:600;text-align:center}
+.sp-qty-input.ok{color:var(--green)}.sp-qty-input.low{color:var(--amber)}.sp-qty-input.out{color:var(--accent)}.sp-qty-input.illimite{color:var(--text2)}
+.sp-illimite{margin-left:6px;vertical-align:middle;padding:0 7px;border:1px solid var(--border2);border-radius:99px;background:none;color:var(--text2);font-size:11px;line-height:18px;cursor:pointer}
+.modal-stock{border-color:rgba(245,158,11,.4)}
+.modal-stock .modal-reset-sub{width:100%;text-align:left}
+.controle-stock-ligne{padding:5px 0;border-top:1px solid var(--border)}
+.modal-stock-corriger{width:100%;padding:10px;border:1px solid var(--border2);border-radius:var(--r-sm);background:none;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
 /* Caisse ouverte depuis l'écran d'accueil de l'iPad (« black-translucent ») : la page passe sous l'heure et la
    batterie. Bordures couleur du fond plutôt que marges, pour que les panneaux latéraux commencent eux aussi
    sous la barre d'état. Valeurs nulles dans Safari et sur PC. */
@@ -470,6 +491,14 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
   .sp-toggle{width:50px;height:30px}
   .sp-toggle::after{width:24px;height:24px}
   .sp-toggle.on::after{left:23px}
+  /* Stock et panier */
+  .stock-panel{width:min(400px,100%)}
+  .sp-qty-input{width:56px;min-height:38px;font-size:16px} /* 16 px : Safari ne zoome pas pendant la saisie */
+  .sp-illimite{min-width:34px;min-height:28px;font-size:13px}
+  .epuises-bar{padding:0 12px 6px;font-size:13px}
+  .epuises-btn{min-height:40px;padding:8px 14px;font-size:13px}
+  .cart-ajuster{min-height:30px;padding:4px 12px;font-size:12px}
+  .modal-reset-btns button,.modal-stock-corriger{min-height:44px}
 }
 /* Paysage (iPad, hauteur suffisante) : le panier prend toute la hauteur à droite, la barre du haut ne couvre
    que le catalogue. Remise et code promo côte à côte. Les téléphones à l'horizontale gardent la disposition
@@ -500,7 +529,10 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
   <button class="btn-sm" onclick="quitterDemonstration()">Quitter la démonstration</button></div>
 <script>
 // Bandeau orange affiché dès le chargement en démonstration, avant le script principal.
-(function(){try{if(localStorage.getItem("shaya_caisse_mode")==="demonstration"){document.body.classList.add("mode-demo");document.getElementById("bandeauDemo").hidden=false;}}catch(e){}})();
+(function(){try{if(localStorage.getItem("shaya_caisse_mode")==="demonstration"){document.body.classList.add("mode-demo");var b=document.getElementById("bandeauDemo");b.hidden=false;
+  // Hauteur du bandeau, suivie quand la largeur change (rotation de l'iPad) : les panneaux latéraux commencent dessous.
+  var h=function(){document.body.style.setProperty("--hauteur-bandeau",b.offsetHeight+"px");};h();
+  if(window.ResizeObserver)new ResizeObserver(h).observe(b);else window.addEventListener("resize",h);}}catch(e){}})();
 </script>
 
 <div class="topbar">
@@ -552,6 +584,7 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
       <button class="tab" onclick="filterCat('Flex',this)">🧴 Flex</button>
       <button class="tab" onclick="filterCat('Pack',this)">🎁 Packs</button>
     </div>
+    <div class="epuises-bar" id="epuisesBar" hidden><span id="epuisesTexte"></span><button class="epuises-btn" id="epuisesBtn" onclick="basculerEpuises()">Afficher les produits épuisés</button></div>
     <div class="products-grid" id="productsGrid"></div>
   </div>
 
@@ -831,6 +864,19 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
   <div class="ep-body" id="epBody"><div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Aucune vente pour le moment</div></div>
 </div>
 
+<!-- Contrôle du stock avant encaissement : rien n'est encaissé, l'ajustement est décidé par vous -->
+<div class="modal-overlay-reset" id="modalStock">
+  <div class="modal-reset modal-stock">
+    <div class="modal-reset-icon">📦</div>
+    <div class="modal-reset-title">Stock insuffisant</div>
+    <div class="modal-reset-sub" id="modalStockListe"></div>
+    <div class="modal-reset-btns">
+      <button class="cancel" onclick="fermerControleStock()">Retour au panier</button>
+      <button class="confirm" onclick="ajusterPanierStock()">Ajuster le panier</button>
+    </div>
+    <button class="modal-stock-corriger" onclick="corrigerStockDepuisControle()">📦 Corriger le stock</button>
+  </div>
+</div>
 <div class="modal-overlay-reset" id="modalReset">
   <div class="modal-reset">
     <div class="modal-reset-icon">🔄</div>
@@ -1296,10 +1342,21 @@ var STOCK_DEPART = {
   25:0,   // Pack Déco 3D
 };
 
+// ── STOCK : UNE SEULE RÈGLE (SHAYA) ───────────────────────────────
+// Stock illimité = STOCK_ILLIMITE (9999), la valeur déjà enregistrée pour les produits sans stock de départ.
+// Toute autre valeur est un nombre réel d'articles (0 = épuisé) : affiché, plafond du panier, décompté à la
+// vente. Les valeurs déjà enregistrées sur l'appareil ne sont pas modifiées.
+var STOCK_ILLIMITE=9999,STOCK_MAX=STOCK_ILLIMITE-1;
+function stockDe(id){var s=stockData[id];return typeof s==="number"&&isFinite(s)?s:STOCK_ILLIMITE;}
+function stockIllimite(s){return s>=STOCK_ILLIMITE;}
+function estEpuise(id){return typeof id==="number"&&stockDe(id)<=0;}
+// Quantité maximale d'un article dans le panier (sans limite pour une autre vente ou un stock illimité).
+function quantiteMax(id){if(typeof id!=="number")return Infinity;var s=stockDe(id);return stockIllimite(s)?Infinity:Math.max(0,s);}
+
 PRODUCTS.forEach(function(p){
   salesData[p.id]={name:p.label,cat:p.cat,emoji:p.emoji,price:p.price,qty:0,ca:0};
   // Stock par défaut depuis STOCK_DEPART — sera écrasé par localStorage si existant
-  stockData[p.id] = STOCK_DEPART[p.id] !== undefined ? STOCK_DEPART[p.id] : 9999;
+  stockData[p.id] = STOCK_DEPART[p.id] !== undefined ? STOCK_DEPART[p.id] : STOCK_ILLIMITE;
 });
 
 // ── CATALOGUE DE SHAYA MANAGER (références et familles) ───────────────────────────────────────
@@ -1338,7 +1395,7 @@ function appliquerCatalogue(cat){
   PRODUCTS=liste;
   PRODUCTS.forEach(function(p){
     if(!salesData[p.id])salesData[p.id]={name:p.label,cat:p.cat,emoji:p.emoji,price:p.price,qty:0,ca:0};
-    if(stockData[p.id]===undefined)stockData[p.id]=STOCK_DEPART[p.id]!==undefined?STOCK_DEPART[p.id]:9999;
+    if(stockData[p.id]===undefined)stockData[p.id]=STOCK_DEPART[p.id]!==undefined?STOCK_DEPART[p.id]:STOCK_ILLIMITE;
   });
 }
 
@@ -1578,24 +1635,31 @@ window.addEventListener("beforeunload",function(e){
 });
 
 function fmt(n){return n.toFixed(2).replace(".",",")+"\u00a0€";}
+function echapperHtml(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 
 // ── CATALOGUE ─────────────────────────────────────────────────
+// Produits épuisés (stock 0) : retirés du catalogue principal ; le bouton « Afficher les produits épuisés »
+// les montre, grisés et non vendables (solution B). Choix non conservé : masqués à chaque ouverture.
+var afficherEpuises=false;
 function renderProducts(){
   var grid=document.getElementById("productsGrid");
   var list=currentCat==="Tous"?PRODUCTS:PRODUCTS.filter(function(p){return p.cat===currentCat;});
   // Filtrer les produits désactivés
   list=list.filter(function(p){return !disabledProducts[p.id];});
+  var epuises=list.filter(function(p){return estEpuise(p.id);}).length;
+  if(!afficherEpuises)list=list.filter(function(p){return !estEpuise(p.id);});
+  majBarreEpuises(epuises);
   var html="";
   list.forEach(function(p){
-    var stock=stockData[p.id]!==undefined?stockData[p.id]:99;
+    var stock=stockDe(p.id);
     var isOut=stock<=0;
     var isLow=stock>0&&stock<=3;
     var desc=p.desc?"<br><span style='font-size:10px;color:var(--text3)'>"+p.desc+"</span>":"";
     var cl=p.type==="sublim"?"Sub":p.type==="pack"?"Pack":p.type==="brod"?"Brod":p.type==="flex"?"Flex":"3D";
     var stockBadge="";
-    if(stock<99){
+    if(!stockIllimite(stock)){
       if(isOut) stockBadge="<span class='stock-badge stock-out'>0 restant</span>";
-      else if(isLow) stockBadge="<span class='stock-badge stock-low'>"+stock+" restants</span>";
+      else if(isLow) stockBadge="<span class='stock-badge stock-low'>"+stock+" restant"+(stock>1?"s":"")+"</span>";
       else stockBadge="<span class='stock-badge stock-ok'>"+stock+" en stock</span>";
     }
     var cardClass="product-card "+p.type+(isOut?" out-of-stock":"");
@@ -1607,8 +1671,18 @@ function renderProducts(){
     html+="<div style='display:flex;justify-content:space-between;align-items:center'>";
     html+="<div class='product-price'>"+fmt(p.price)+"</div><div class='product-cat'>"+cl+"</div></div></div>";
   });
+  if(!list.length)html="<div class='products-vide'>"+(epuises&&!afficherEpuises?"Tous les produits de cette catégorie sont épuisés.":"Aucun produit à afficher dans cette catégorie.")+"</div>";
   grid.innerHTML=html;
 }
+function majBarreEpuises(n){
+  var bar=document.getElementById("epuisesBar");if(!bar)return;
+  bar.hidden=!n;
+  if(!n)return;
+  var pl=n>1?"s":"";
+  document.getElementById("epuisesTexte").textContent=n+" produit"+pl+" épuisé"+pl+(afficherEpuises?" affiché"+pl+" (non vendable"+pl+")":" masqué"+pl);
+  document.getElementById("epuisesBtn").textContent=afficherEpuises?"Masquer les produits épuisés":"Afficher les produits épuisés";
+}
+window.basculerEpuises=function(){afficherEpuises=!afficherEpuises;renderProducts();};
 
 window.filterCat=function(cat,btn){
   currentCat=cat;
@@ -1620,11 +1694,11 @@ window.filterCat=function(cat,btn){
 window.addToCart=function(id){
   var prod=PRODUCTS.find(function(p){return p.id===id;});
   if(!prod)return;
-  var stock=stockData[id]!==undefined?stockData[id]:99;
+  var max=quantiteMax(id);
   var inCart=0;
   var ex=cart.find(function(i){return i.id===id;});
   if(ex) inCart=ex.qty;
-  if(stock<99&&inCart>=stock){showToast("⚠️ Stock insuffisant ("+stock+" dispo)");return;}
+  if(inCart>=max){showToast(max<=0?"⚠️ "+prod.label+" : épuisé":"⚠️ Stock maximal atteint ("+max+" disponible"+(max>1?"s":"")+")");return;}
   if(ex){ex.qty++;}else{cart.push({id:prod.id,name:prod.label,price:prod.price,emoji:prod.emoji,cat:prod.cat,qty:1,reference:prod.reference||null,famille:prod.famille||null});}
   showToast(prod.emoji+" "+prod.label+" ajouté");renderCart();updateTotals();updateStandCartActive();
 };
@@ -1632,10 +1706,7 @@ window.addToCart=function(id){
 window.changeQtyById=function(id,delta){
   var idx=cart.findIndex(function(i){return i.id==id;});
   if(idx===-1)return;
-  if(delta>0){
-    var stock=stockData[id]!==undefined?stockData[id]:99;
-    if(stock<99&&cart[idx].qty>=stock){showToast("⚠️ Stock insuffisant");return;}
-  }
+  if(delta>0&&cart[idx].qty>=quantiteMax(id)){showToast("⚠️ Stock maximal atteint");return;}
   cart[idx].qty+=delta;
   if(cart[idx].qty<=0)cart.splice(idx,1);
   renderCart();updateTotals();updateStandCartActive();
@@ -1644,10 +1715,7 @@ window.changeQty=function(id,delta){
   var idx=cart.findIndex(function(i){return i.id===id;});
   if(idx===-1)return;
   // Vérifier stock si on augmente
-  if(delta>0){
-    var stock=stockData[id]!==undefined?stockData[id]:99;
-    if(stock<99&&cart[idx].qty>=stock){showToast("⚠️ Stock insuffisant");return;}
-  }
+  if(delta>0&&cart[idx].qty>=quantiteMax(id)){showToast("⚠️ Stock maximal atteint");return;}
   cart[idx].qty+=delta;
   if(cart[idx].qty<=0)cart.splice(idx,1);
   renderCart();updateTotals();updateStandCartActive();
@@ -1661,13 +1729,52 @@ function renderCart(){
   var html="";
   cart.forEach(function(item,idx){
     var sid=JSON.stringify(item.id);
-    html+="<div class='cart-item'><div style='font-size:18px'>"+item.emoji+"</div>";
-    html+="<div class='cart-item-info'><div class='cart-item-name'>"+item.name+"</div><div class='cart-item-sub'>"+fmt(item.price)+" / unité</div></div>";
-    html+="<div class='qty-ctrl'><button class='qty-btn' onclick='changeQtyById("+sid+",-1)'>−</button><span class='qty-num'>"+item.qty+"</span><button class='qty-btn' onclick='changeQtyById("+sid+",1)'>+</button></div>";
+    // Bouton + désactivé au stock maximal. Ligne au-delà du stock (stock modifié depuis l'ajout) : signalée
+    // avec un bouton d'ajustement, jamais retirée ni réduite d'elle-même.
+    var max=quantiteMax(item.id),plein=item.qty>=max,depasse=item.qty>max;
+    html+="<div class='cart-item"+(depasse?" cart-item-alerte":"")+"'><div style='font-size:18px'>"+item.emoji+"</div>";
+    html+="<div class='cart-item-info'><div class='cart-item-name'>"+item.name+"</div><div class='cart-item-sub'>"+fmt(item.price)+" / unité</div>";
+    if(depasse)html+="<div class='cart-item-alerte-txt'>⚠️ "+(max<=0?"Épuisé":max+" en stock")+"<button class='cart-ajuster' onclick='ajusterLigneStock("+sid+")'>"+(max<=0?"Retirer du panier":"Ajuster à "+max)+"</button></div>";
+    html+="</div>";
+    html+="<div class='qty-ctrl'><button class='qty-btn' onclick='changeQtyById("+sid+",-1)'>−</button><span class='qty-num'>"+item.qty+"</span><button class='qty-btn' onclick='changeQtyById("+sid+",1)'"+(plein?" disabled title='Stock maximal atteint'":"")+">+</button></div>";
     html+="<div class='cart-item-price'>"+fmt(item.price*item.qty)+"</div></div>";
   });
   container.innerHTML=html;
 }
+
+// ── PANIER ET STOCK (SHAYA) : contrôle avant chaque encaissement, ajustement sur décision seulement ──
+function lignesHorsStock(){return cart.filter(function(i){return i.qty>quantiteMax(i.id);});}
+function signalerPanierHorsStock(){
+  var n=lignesHorsStock().length;
+  if(n)showToast("⚠️ Stock modifié : "+n+" article"+(n>1?"s":"")+" du panier "+(n>1?"dépassent":"dépasse")+" le stock, à ajuster");
+}
+function ajusterLigne(item){var max=quantiteMax(item.id);if(item.qty>max)item.qty=Math.max(0,max);}
+function majPanier(){renderCart();updateTotals();calcMonnaie();if(typeof updateStandCartActive==="function")updateStandCartActive();}
+window.ajusterLigneStock=function(id){
+  var item=cart.find(function(i){return i.id===id;});if(!item)return;
+  ajusterLigne(item);cart=cart.filter(function(i){return i.qty>0;});
+  majPanier();
+};
+function ouvrirControleStock(lignes){
+  var h="<div style='margin-bottom:6px'>Rien n'a été encaissé : le panier dépasse le stock disponible.</div>";
+  lignes.forEach(function(i){
+    var max=quantiteMax(i.id);
+    h+="<div class='controle-stock-ligne'><strong>"+echapperHtml(i.name)+"</strong> : "+i.qty+" dans le panier, "+(max<=0?"épuisé → retiré du panier":max+" en stock → "+max)+"</div>";
+  });
+  h+="<div style='margin-top:6px;color:var(--text3)'>Stock affiché faux ? Corrigez-le dans 📦 Stock.</div>";
+  document.getElementById("modalStockListe").innerHTML=h;
+  document.getElementById("modalStock").classList.add("open");
+}
+window.fermerControleStock=function(){document.getElementById("modalStock").classList.remove("open");};
+window.ajusterPanierStock=function(){
+  cart.forEach(ajusterLigne);cart=cart.filter(function(i){return i.qty>0;});
+  fermerControleStock();majPanier();
+  showToast("Panier ajusté au stock : vérifiez le total avant d'encaisser");
+};
+window.corrigerStockDepuisControle=function(){
+  fermerControleStock();
+  var sp=document.getElementById("stockPanel");if(sp&&!sp.classList.contains("open"))window.toggleStock();
+};
 
 function updateTotals(){
   // Même calcul que l'encaissement : remise manuelle + code promo, arrondi au centime (SHAYA).
@@ -1709,6 +1816,9 @@ window.selectMode=function(mode){
 window.confirmerPaiement=function(){
   if(!cart.length||!payMode)return;
   verifierChangementDeJour();
+  // Quantités vérifiées avant chaque encaissement : rien n'est encaissé au-delà du stock (SHAYA).
+  var horsStock=lignesHorsStock();
+  if(horsStock.length){ouvrirControleStock(horsStock);return;}
   // Montant enregistré = montant réellement encaissé (remise manuelle ET code promo) — SHAYA.
   var t0=calculerTotaux();
   var total=t0.total;
@@ -1733,7 +1843,7 @@ window.confirmerPaiement=function(){
       salesData[item.id]={name:item.name,cat:item.cat||"Autre",emoji:item.emoji||"📦",price:item.price,qty:item.qty,ca:item.totalNet};
     }
     // Décompter stock (seulement articles catalogue)
-    if(typeof item.id==="number"&&stockData[item.id]!==undefined&&stockData[item.id]<9999){
+    if(typeof item.id==="number"&&stockData[item.id]!==undefined&&!stockIllimite(stockDe(item.id))){
       stockData[item.id]=Math.max(0,stockData[item.id]-item.qty);
       if(stockData[item.id]<=3&&stockData[item.id]>0){
         var prodBas=PRODUCTS.find(function(p){return p.id===item.id;});
@@ -1744,6 +1854,7 @@ window.confirmerPaiement=function(){
   document.getElementById("nbVentes").textContent=ticketsEncaisses().length;
   document.getElementById("caJour").textContent=fmt(totalCA);
   document.getElementById("caTotal").textContent=fmt(totalCA);
+  updateSoldeCaisse();   // solde des espèces de la barre du haut, à jour après chaque vente
   var icons={CB:"💳","Espèces":"💵",SumUp:"📱",Virement:"🏦"};
   document.getElementById("modalIcon").textContent=icons[ticket.mode]||"✅";
   document.getElementById("modalAmount").textContent=fmt(total);
@@ -1789,36 +1900,61 @@ function renderStockPanel(){
   var body=document.getElementById("spBody");if(!body)return;
   var html="";
   PRODUCTS.forEach(function(p){
-    var stock=stockData[p.id]!==undefined?stockData[p.id]:9999;
+    var stock=stockDe(p.id),illimite=stockIllimite(stock);
     var isOut=stock<=0,isLow=stock>0&&stock<=3;
-    var numCls=isOut?"out":isLow?"low":"ok";
-    var display=stock>=9999?"∞":stock;
+    var numCls=illimite?"illimite":isOut?"out":isLow?"low":"ok";
     var isDis=disabledProducts[p.id]===true;
     html+="<div class='sp-item'"+(isDis?" style='opacity:.55'":"")+"> ";
     html+="<button class='sp-toggle "+(isDis?"off":"on")+"' onclick='toggleProduct("+p.id+")'></button>";
     html+="<div style='font-size:16px'>"+p.emoji+"</div>";
-    html+="<div class='sp-item-info'><div class='sp-item-name'"+(isDis?" style='color:var(--text3)'":"")+">"+p.label+"</div><div class='sp-item-cat'>"+p.cat+"</div></div>";
+    html+="<div class='sp-item-info'><div class='sp-item-name'"+(isDis?" style='color:var(--text3)'":"")+">"+p.label+"</div><div class='sp-item-cat'>"+p.cat;
+    if(!illimite)html+="<button class='sp-illimite' onclick='rendreStockIllimite("+p.id+")' title='Rendre le stock illimité'>∞</button>";
+    html+="</div></div>";
     html+="<div class='sp-qty-ctrl'>";
-    html+="<button class='sp-qty-btn' onclick='changeStock("+p.id+",-1)'>−</button>";
-    html+="<span class='sp-qty-num "+numCls+"'>"+display+"</span>";
-    html+="<button class='sp-qty-btn' onclick='changeStock("+p.id+",1)'>+</button>";
+    html+="<button class='sp-qty-btn' onclick='changeStock("+p.id+",-1)'"+(illimite||isOut?" disabled":"")+">−</button>";
+    // Saisie directe (clavier numérique de l'iPad) ; « ∞ » = stock illimité, limité dès qu'une quantité est saisie.
+    html+="<input class='sp-qty-input "+numCls+"' type='text' inputmode='numeric' pattern='[0-9]*' autocomplete='off' value='"+(illimite?"∞":stock)+"'"
+      +" aria-label='Stock : "+echapperHtml(p.label)+"' onfocus='this.select()' onkeydown='if(event.key==\"Enter\")this.blur()' onchange='saisirStock("+p.id+",this)'>";
+    html+="<button class='sp-qty-btn' onclick='changeStock("+p.id+",1)'"+(illimite||stock>=STOCK_MAX?" disabled":"")+">+</button>";
     html+="</div></div>";
   });
   body.innerHTML=html;
 }
 
+// Stock d'un produit modifié : catalogue, panneau et panier à jour ; un panier qui dépasse est signalé.
+function definirStock(id,valeur){
+  stockData[id]=valeur;
+  renderStockPanel();renderProducts();renderCart();sauvegarder();
+  signalerPanierHorsStock();
+}
 window.changeStock=function(id,delta){
-  if(stockData[id]===undefined)stockData[id]=99;
-  if(stockData[id]>=99&&delta>0)return;
-  if(stockData[id]>=99&&delta<0)stockData[id]=10;
-  else stockData[id]=Math.max(0,stockData[id]+delta);
-  renderStockPanel();renderProducts();sauvegarder();
+  var s=stockDe(id);
+  if(stockIllimite(s))return;   // stock illimité : saisir une quantité pour le limiter
+  definirStock(id,Math.min(STOCK_MAX,Math.max(0,s+delta)));
+};
+// Quantité saisie : nombre entier de 0 à STOCK_MAX ; une saisie invalide est refusée, rien n'est modifié.
+window.saisirStock=function(id,champ){
+  var actuel=stockDe(id),affiche=stockIllimite(actuel)?"∞":String(actuel);
+  var brut=String(champ.value||"").trim();
+  if(brut===affiche)return;
+  if(!/^[0-9]{1,4}$/.test(brut)||Number(brut)>STOCK_MAX){
+    champ.value=affiche;
+    showToast("Quantité invalide : nombre entier de 0 à "+STOCK_MAX);
+    return;
+  }
+  definirStock(id,Number(brut));
+};
+window.rendreStockIllimite=function(id){
+  var p=PRODUCTS.find(function(x){return x.id===id;});
+  if(!window.confirm("Stock illimité pour « "+(p?p.label:id)+" » ?\nIl ne sera plus décompté ni limité dans le panier."))return;
+  definirStock(id,STOCK_ILLIMITE);
 };
 
 window.resetAllStock=function(){
-  if(!confirm("Remettre tous les stocks à zéro ?"))return;
+  if(!confirm("Remettre le stock de tous les produits à 0 ?\nIls seront tous épuisés et masqués du catalogue, stocks illimités compris."))return;
   PRODUCTS.forEach(function(p){stockData[p.id]=0;});
-  renderStockPanel();renderProducts();sauvegarder();
+  renderStockPanel();renderProducts();renderCart();sauvegarder();
+  signalerPanierHorsStock();
   showToast("Stock remis à zéro");
 };
 
@@ -1915,11 +2051,11 @@ window.downloadExcel=function(dateForcee){
     ["ID","Produit","Categorie","Stock restant","Stock initial","Vendus"]
   ];
   PRODUCTS.forEach(function(p){
-    var restant = stockData[p.id] !== undefined ? stockData[p.id] : 99;
-    var initial = STOCK_DEPART[p.id] !== undefined ? STOCK_DEPART[p.id] : 99;
+    var restant = stockDe(p.id);
+    var initial = STOCK_DEPART[p.id] !== undefined ? STOCK_DEPART[p.id] : STOCK_ILLIMITE;
     var vendus  = salesData[p.id] ? salesData[p.id].qty : 0;
-    var restantLabel = restant >= 99 ? "Illimite" : restant;
-    var initialLabel = initial >= 99 ? "Illimite" : initial;
+    var restantLabel = stockIllimite(restant) ? "Illimite" : restant;
+    var initialLabel = stockIllimite(initial) ? "Illimite" : initial;
     aoa_stock.push([p.id, p.label, p.cat, restantLabel, initialLabel, vendus]);
   });
   // Ligne total
@@ -2008,14 +2144,14 @@ window.annulerTicket=function(uid){
   t.items.forEach(function(l){
     var net=l.totalNet!==undefined?l.totalNet:l.price*l.qty;
     if(salesData[l.id]){salesData[l.id].qty-=l.qty;salesData[l.id].ca=arrondi(salesData[l.id].ca-net);}
-    if(typeof l.id==="number"&&stockData[l.id]!==undefined&&stockData[l.id]<9999)stockData[l.id]+=l.qty;
+    if(typeof l.id==="number"&&stockData[l.id]!==undefined&&!stockIllimite(stockDe(l.id)))stockData[l.id]=Math.min(STOCK_MAX,stockData[l.id]+l.qty);
   });
   autresVentes.forEach(function(v){if(v.ticketUid===uid)v.annule=true;});
   totalCA=caEncaisse();
   document.getElementById("nbVentes").textContent=ticketsEncaisses().length;
   document.getElementById("caJour").textContent=fmt(totalCA);document.getElementById("caTotal").textContent=fmt(totalCA);
   updateObjectifBar();renderTickets();renderExcelPanel();renderStockPanel();renderProducts();
-  updateSoldeCaisse();renderAutres();sauvegarder();
+  updateSoldeCaisse();renderAutres();renderCart();sauvegarder();
   mettreEnFileAnnulation(t);
   showToast("Vente #"+("00"+t.num).slice(-3)+" annulée (conservée dans l'historique)");
 };
@@ -2089,6 +2225,8 @@ window.addPromoCode=function(){
   renderPromoCodes();sauvegarder();showToast("Code "+code+" cree");
 };
 window.deletePromoCode=function(code){
+  var appliqueAuPanier=activePromo&&activePromo.code===code;
+  if(!window.confirm("Supprimer le code promo « "+code+" » ?"+(appliqueAuPanier?"\nIl est appliqué au panier en cours : sa remise sera retirée.":"")))return;
   if(activePromo&&activePromo.code===code){activePromo=null;updateTotals();}
   delete promoCodes[code];renderPromoCodes();sauvegarder();
 };
@@ -2154,11 +2292,13 @@ window.toggleProduct=function(id){
   if(p)showToast(disabledProducts[id]?"🚫 "+p.label+" désactivé":"✅ "+p.label+" activé");
 };
 window.enableAllProducts=function(){
+  if(!window.confirm("Réactiver tous les produits du catalogue ?\nLes produits que vous aviez désactivés réapparaîtront."))return;
   disabledProducts={};
   renderStockPanel();renderProducts();sauvegarder();
   showToast("✅ Tous les produits activés !");
 };
 window.disableAllProducts=function(){
+  if(!window.confirm("Désactiver tous les produits ?\nLe catalogue sera vide jusqu'à leur réactivation."))return;
   PRODUCTS.forEach(function(p){disabledProducts[p.id]=true;});
   renderStockPanel();renderProducts();sauvegarder();
   showToast("🚫 Tous les produits désactivés");
@@ -2454,7 +2594,7 @@ window.downloadReapPDF=function(){
       // Stock coloré
       if(stock===0){doc.setTextColor(200,40,40);doc.setFont("helvetica","bold");doc.text("ÉPUISÉ",margin+128,y+4);}
       else if(stock<=3){doc.setTextColor(200,110,0);doc.setFont("helvetica","bold");doc.text(stock.toString(),margin+128,y+4);}
-      else{doc.setTextColor(30,140,70);doc.setFont("helvetica","normal");doc.text(stock.toString(),margin+128,y+4);}
+      else{doc.setTextColor(30,140,70);doc.setFont("helvetica","normal");doc.text(stockIllimite(stock)?"Illimité":stock.toString(),margin+128,y+4);}
 
       doc.setTextColor(80,60,100);
       doc.setFont("helvetica","normal");
@@ -3052,7 +3192,11 @@ window.addSortie=function(){
   document.getElementById("cpSortieLabel").value="";document.getElementById("cpSortieMontant").value="";
   updateSoldeCaisse();renderCaisse();sauvegarder();showToast("Sortie: -"+fmt(montant));
 };
-window.deleteSortie=function(idx){sortiesCaisse.splice(idx,1);updateSoldeCaisse();renderCaisse();sauvegarder();};
+window.deleteSortie=function(idx){
+  var s=sortiesCaisse[idx];if(!s)return;
+  if(!window.confirm("Supprimer la sortie de caisse « "+s.label+" » ("+fmt(s.montant)+") ?\nLe solde des espèces sera recalculé."))return;
+  sortiesCaisse.splice(idx,1);updateSoldeCaisse();renderCaisse();sauvegarder();
+};
 function renderCaisse(){
   var el=document.getElementById("cpFond");if(el&&!el.value)el.value=fondCaisse||"";
   var eo=document.getElementById("cpObjectif");if(eo&&!eo.value&&objectifCA)eo.value=objectifCA;
@@ -3114,7 +3258,11 @@ window.addDon=function(){
   document.getElementById("donLabel").value="";document.getElementById("donValeur").value="";
   renderDons();sauvegarder();showToast("Don noté: "+label);
 };
-window.deleteDon=function(idx){donsTombola.splice(idx,1);renderDons();sauvegarder();};
+window.deleteDon=function(idx){
+  var d=donsTombola[idx];if(!d)return;
+  if(!window.confirm("Supprimer le don « "+d.label+" » ("+fmt(d.valeur)+") ?"))return;
+  donsTombola.splice(idx,1);renderDons();sauvegarder();
+};
 window.addGainObjet=function(){
   var label=document.getElementById("gainLabel").value.trim();
   var raw=(document.getElementById("gainValeur").value||"").replace(",",".");var valeur=parseFloat(raw)||0;
@@ -3125,7 +3273,11 @@ window.addGainObjet=function(){
   document.querySelectorAll("#gainPresets .billet-btn").forEach(function(b){b.classList.remove("sel");});
   renderDons();sauvegarder();showToast("Gain noté: "+label);
 };
-window.deleteGainObjet=function(idx){gainsObjets.splice(idx,1);renderDons();sauvegarder();};
+window.deleteGainObjet=function(idx){
+  var g=gainsObjets[idx];if(!g)return;
+  if(!window.confirm("Supprimer le gain « "+g.label+" » ("+fmt(g.valeur)+") ?"))return;
+  gainsObjets.splice(idx,1);renderDons();sauvegarder();
+};
 function renderDons(){
   var dl=document.getElementById("donsListe");var dTot=donsTombola.reduce(function(s,d){return s+d.valeur;},0);
   var dTotEl=document.getElementById("donsTotalVal");if(dTotEl)dTotEl.textContent=fmt(dTot);

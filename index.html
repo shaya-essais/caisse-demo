@@ -34,7 +34,7 @@
   try{history.replaceState(history.state,"",propre);}catch(e){}
 })();
 </script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Caisse (démonstration) — Les projets de Shaya</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -402,6 +402,96 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .btn-flash:active{transform:scale(.96)}
 .btn-flash.on{animation:flashBtnGlow 1s ease-in-out infinite alternate}
 @keyframes flashBtnGlow{from{box-shadow:0 0 8px rgba(233,69,96,.4)}to{box-shadow:0 0 22px rgba(233,69,96,.8)}}
+/* ── LISIBILITÉ DES TUILES ET TABLETTE (iPad) ──────────────────
+   Lignes de la grille à la hauteur de leur contenu : sans cela, quand les produits ne tiennent pas en
+   hauteur, le navigateur écrase les tuiles (nom et prix masqués) au lieu de faire défiler la grille. */
+.products-grid{grid-auto-rows:max-content}
+.product-card{min-height:96px}
+.product-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.product-card.out-of-stock .stock-badge{display:none}
+/* « ÉPUISÉ » en pastille dans le coin (à la place du stock) : le nom et le prix restent lisibles. */
+.product-card.out-of-stock::after{inset:auto;top:5px;right:5px;padding:2px 7px;font-size:10px;line-height:1.4;border-radius:99px;background:rgba(233,69,96,.25)}
+/* Caisse ouverte depuis l'écran d'accueil de l'iPad (« black-translucent ») : la page passe sous l'heure et la
+   batterie. Bordures couleur du fond plutôt que marges, pour que les panneaux latéraux commencent eux aussi
+   sous la barre d'état. Valeurs nulles dans Safari et sur PC. */
+body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(safe-area-inset-bottom,0px) solid var(--bg)}
+/* ── TABLETTE (iPad) : cases tactiles de 44 px au moins, rien de masqué ni d'écrasé ─────────────────── */
+@media (max-width:1366px),(pointer:coarse){
+  html{touch-action:manipulation} /* deux touchers rapides sur un produit = deux articles, jamais un zoom */
+  /* Barre du haut : 1re ligne = logo et compteurs ; lignes suivantes = boutons d'action, qui remplissent la
+     largeur. Le pseudo-élément force le retour à la ligne entre les deux. */
+  .topbar{flex-wrap:wrap;align-items:center;row-gap:5px;padding:6px 12px}
+  .topbar-right{display:contents}
+  .topbar::after{content:"";flex-basis:100%;order:1}
+  .topbar-right>button,.topbar-right>.mode-switch{order:2;flex:1 1 auto;justify-content:center}
+  .topbar-right>button{min-height:44px;font-size:13px;padding:6px 10px}
+  .mode-btn{flex:1;min-height:38px;font-size:13px}
+  .logo-dot,.event-badge{display:none}
+  .stat-pill,.stat-pill-solde{font-size:13px;padding:6px 12px}
+  /* Onglets : sur plusieurs lignes plutôt que cachés hors de l'écran. */
+  .cat-tabs{flex-wrap:wrap;padding:8px 12px}
+  .tab{min-height:40px;padding:8px 14px;font-size:13px}
+  .products-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;padding:8px 12px 16px}
+  .product-card{min-height:100px;padding:12px;gap:6px}
+  .product-icon{font-size:28px}
+  .product-name{font-size:13px;-webkit-hyphens:auto;hyphens:auto}
+  .product-price{font-size:14px}
+  .stock-badge{font-size:10px;padding:2px 7px}
+  /* Panier : si la hauteur manque, il défile en entier et « Encaisser » reste visible en bas. */
+  .panier{overflow-y:auto}
+  .panier-items{flex:1 1 auto;min-height:150px}
+  .paiement-section{position:sticky;bottom:0;z-index:1;background:var(--surface)}
+  .cart-item{padding:8px;gap:6px}
+  .cart-item-name{font-size:13px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;-webkit-hyphens:auto;hyphens:auto}
+  .cart-item-sub{font-size:11px}
+  .cart-item-price{font-size:13px}
+  .qty-ctrl{gap:4px}
+  .qty-btn{width:36px;height:36px;font-size:18px}
+  .qty-num{min-width:20px;font-size:14px}
+  .discount-inner,.promo-input-inner{min-height:42px}
+  .discount-input,.promo-input-field{font-size:16px}
+  .promo-input-field{width:0;min-width:0} /* sinon la largeur propre du champ pousse le bouton OK hors du cadre */
+  .promo-status:empty{display:none}
+  .promo-apply-btn{min-height:32px;padding:6px 14px;font-size:13px}
+  .total-row.main{font-size:22px}
+  .pay-btn{min-height:48px;font-size:14px;justify-content:center}
+  /* Billets sur une seule ligne ; !important car la disposition d'origine est écrite dans la balise. */
+  #billetBtns{display:grid!important;grid-template-columns:repeat(5,1fr)}
+  .billet-btn{min-height:44px;padding:0;font-size:14px}
+  #billetCustom{width:110px!important;padding:8px 10px!important;font-size:16px!important}
+  .pay-confirm{min-height:54px;font-size:16px}
+  /* Panneaux latéraux et fenêtres */
+  [class$="-header"]>.btn-sm,.flash-header>button{min-width:44px;min-height:44px;font-size:15px}
+  [class$="-body"] .btn-sm{min-height:40px}
+  .sp-qty-btn{width:38px;height:38px;font-size:18px}
+  .cp-del,.pp-code-del{width:34px;height:34px;font-size:14px}
+  .cp-btn,.pp-add-btn,.sp-reset-btn,.modal-btn,.flash-preset,.flash-time{min-height:44px}
+  .cp-input,.pp-input{font-size:16px}
+  .sp-toggle{width:50px;height:30px}
+  .sp-toggle::after{width:24px;height:24px}
+  .sp-toggle.on::after{left:23px}
+}
+/* Paysage (iPad, hauteur suffisante) : le panier prend toute la hauteur à droite, la barre du haut ne couvre
+   que le catalogue. Remise et code promo côte à côte. Les téléphones à l'horizontale gardent la disposition
+   d'origine. */
+@media (orientation:landscape) and (max-width:1366px) and (min-height:600px),(orientation:landscape) and (pointer:coarse) and (min-height:600px){
+  body{display:grid;grid-template-columns:minmax(0,1fr) 350px;grid-template-rows:auto auto minmax(0,1fr)}
+  .bandeau-demo{grid-column:1/-1;grid-row:1}
+  .topbar{grid-column:1;grid-row:2}
+  body>.main{display:contents}
+  .catalog{grid-column:1;grid-row:3;min-height:0;border-right:none}
+  .panier{grid-column:2;grid-row:2/4;width:auto;min-height:0;border-left:1px solid var(--border2);
+    display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);grid-template-rows:auto minmax(150px,1fr) auto auto auto auto;
+    grid-template-areas:"tete tete" "articles articles" "remise promo" "totaux totaux" "roue roue" "paiement paiement"}
+  .panier-header{grid-area:tete}
+  .panier-items{grid-area:articles;min-height:0}
+  .discount-row{grid-area:remise;padding:8px 4px 8px 10px}
+  .discount-inner{gap:6px;padding:5px 8px}
+  .promo-input-row{grid-area:promo;padding:8px 10px 8px 4px}
+  .totaux{grid-area:totaux}
+  .wheel-history-section{grid-area:roue}
+  .paiement-section{grid-area:paiement}
+}
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>

@@ -492,6 +492,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .bilan-tableau th:first-child,.bilan-tableau td:first-child{text-align:left}
 .bilan-tableau .cloture-ecart{font-size:12px}
 .marche-grille.trois{grid-template-columns:repeat(3,1fr)}
+.bilan-tableau td.note{white-space:normal;min-width:140px}
 .btn-bilan{margin-left:6px;padding:2px 10px;border:1px solid var(--border2);border-radius:99px;background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
 /* Caisse ouverte depuis l'écran d'accueil de l'iPad (« black-translucent ») : la page passe sous l'heure et la
    batterie. Bordures couleur du fond plutôt que marges, pour que les panneaux latéraux commencent eux aussi
@@ -1751,6 +1752,10 @@ window.addEventListener("beforeunload",function(e){
 });
 
 function fmt(n){return n.toFixed(2).replace(".",",")+"\u00a0€";}
+// Champ de quantité touché : tout son contenu est sélectionné et la saisie le remplace. Dans Safari (iPad), la
+// sélection faite au focus est perdue au relâchement du doigt : elle est refaite une fois à ce moment-là.
+window.selectionnerChamp=function(c){c.dataset.selection="1";setTimeout(function(){try{c.setSelectionRange(0,c.value.length);}catch(e){c.select();}},0);};
+window.finToucherChamp=function(c){if(c.dataset.selection!=="1")return;delete c.dataset.selection;try{c.setSelectionRange(0,c.value.length);}catch(e){c.select();}};
 function echapperHtml(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 
 // ── CATALOGUE ─────────────────────────────────────────────────
@@ -2015,36 +2020,40 @@ window.toggleStock=function(){
   renderStockPanel();
 };
 
+function ligneStock(p){
+  var stock=stockDe(p.id),illimite=stockIllimite(stock);
+  var isOut=stock<=0,isLow=stock>0&&stock<=3;
+  var numCls=illimite?"illimite":isOut?"out":isLow?"low":"ok";
+  var isDis=disabledProducts[p.id]===true;
+  var html="<div class='sp-item' data-stock-id='"+p.id+"'"+(isDis?" style='opacity:.55'":"")+"> ";
+  html+="<button class='sp-toggle "+(isDis?"off":"on")+"' onclick='toggleProduct("+p.id+")'></button>";
+  html+="<div style='font-size:16px'>"+p.emoji+"</div>";
+  html+="<div class='sp-item-info'><div class='sp-item-name'"+(isDis?" style='color:var(--text3)'":"")+">"+p.label+"</div><div class='sp-item-cat'>"+p.cat;
+  if(!illimite)html+="<button class='sp-illimite' onclick='rendreStockIllimite("+p.id+")' title='Rendre le stock illimité'>∞</button>";
+  html+="</div></div>";
+  html+="<div class='sp-qty-ctrl'>";
+  html+="<button class='sp-qty-btn' onclick='changeStock("+p.id+",-1)'"+(illimite||isOut?" disabled":"")+">−</button>";
+  // Saisie directe (clavier numérique de l'iPad) ; « ∞ » = stock illimité, limité dès qu'une quantité est saisie.
+  html+="<input class='sp-qty-input "+numCls+"' type='text' inputmode='numeric' pattern='[0-9]*' autocomplete='off' value='"+(illimite?"∞":stock)+"'"
+    +" aria-label='Stock : "+echapperHtml(p.label)+"' onfocus='selectionnerChamp(this)' onpointerup='finToucherChamp(this)' onkeydown='if(event.key==\"Enter\")this.blur()' onchange='saisirStock("+p.id+",this)'>";
+  html+="<button class='sp-qty-btn' onclick='changeStock("+p.id+",1)'"+(illimite||stock>=STOCK_MAX?" disabled":"")+">+</button>";
+  return html+"</div></div>";
+}
 function renderStockPanel(){
   var body=document.getElementById("spBody");if(!body)return;
-  var html="";
-  PRODUCTS.forEach(function(p){
-    var stock=stockDe(p.id),illimite=stockIllimite(stock);
-    var isOut=stock<=0,isLow=stock>0&&stock<=3;
-    var numCls=illimite?"illimite":isOut?"out":isLow?"low":"ok";
-    var isDis=disabledProducts[p.id]===true;
-    html+="<div class='sp-item'"+(isDis?" style='opacity:.55'":"")+"> ";
-    html+="<button class='sp-toggle "+(isDis?"off":"on")+"' onclick='toggleProduct("+p.id+")'></button>";
-    html+="<div style='font-size:16px'>"+p.emoji+"</div>";
-    html+="<div class='sp-item-info'><div class='sp-item-name'"+(isDis?" style='color:var(--text3)'":"")+">"+p.label+"</div><div class='sp-item-cat'>"+p.cat;
-    if(!illimite)html+="<button class='sp-illimite' onclick='rendreStockIllimite("+p.id+")' title='Rendre le stock illimité'>∞</button>";
-    html+="</div></div>";
-    html+="<div class='sp-qty-ctrl'>";
-    html+="<button class='sp-qty-btn' onclick='changeStock("+p.id+",-1)'"+(illimite||isOut?" disabled":"")+">−</button>";
-    // Saisie directe (clavier numérique de l'iPad) ; « ∞ » = stock illimité, limité dès qu'une quantité est saisie.
-    html+="<input class='sp-qty-input "+numCls+"' type='text' inputmode='numeric' pattern='[0-9]*' autocomplete='off' value='"+(illimite?"∞":stock)+"'"
-      +" aria-label='Stock : "+echapperHtml(p.label)+"' onfocus='this.select()' onkeydown='if(event.key==\"Enter\")this.blur()' onchange='saisirStock("+p.id+",this)'>";
-    html+="<button class='sp-qty-btn' onclick='changeStock("+p.id+",1)'"+(illimite||stock>=STOCK_MAX?" disabled":"")+">+</button>";
-    html+="</div></div>";
-  });
-  body.innerHTML=html;
+  body.innerHTML=PRODUCTS.map(ligneStock).join("");
+}
+// Une seule ligne redessinée après une saisie : le champ que l'on vient de toucher ailleurs garde le clavier.
+function majLigneStock(id){
+  var p=PRODUCTS.find(function(x){return x.id===id;}),ligne=document.querySelector("#spBody [data-stock-id='"+id+"']");
+  if(p&&ligne)ligne.outerHTML=ligneStock(p);else renderStockPanel();
 }
 
 // Stock d'un produit modifié : catalogue, panneau et panier à jour ; un panier qui dépasse est signalé.
 function definirStock(id,valeur){
   stockData[id]=valeur;
   noterModificationMarche("stock",[id]);
-  renderStockPanel();renderProducts();renderCart();sauvegarder();
+  majLigneStock(id);renderProducts();renderCart();sauvegarder();
   signalerPanierHorsStock();
 }
 window.changeStock=function(id,delta){
@@ -3332,7 +3341,7 @@ function lignePreparation(p){
   h+="</div></div><div class='sp-qty-ctrl'>";
   h+="<button class='sp-qty-btn' onclick='prepChanger("+p.id+",-1)'"+(illimite||q<=0?" disabled":"")+">−</button>";
   h+="<input class='sp-qty-input "+(illimite?"illimite":q<=0?"out":"ok")+"' type='text' inputmode='numeric' pattern='[0-9]*' autocomplete='off' value='"+(illimite?"∞":q)+"'"
-    +" aria-label='Quantité emportée : "+echapperHtml(p.label)+"' onfocus='this.select()' onkeydown='if(event.key==\"Enter\")this.blur()' onchange='prepSaisir("+p.id+",this)'>";
+    +" aria-label='Quantité emportée : "+echapperHtml(p.label)+"' onfocus='selectionnerChamp(this)' onpointerup='finToucherChamp(this)' onkeydown='if(event.key==\"Enter\")this.blur()' onchange='prepSaisir("+p.id+",this)'>";
   h+="<button class='sp-qty-btn' onclick='prepChanger("+p.id+",1)'"+(illimite||q>=STOCK_MAX?" disabled":"")+">+</button>";
   return h+"</div></div>";
 }
@@ -3730,6 +3739,10 @@ window.ouvrirClotureJour=function(){
   h+=ligneMarche("Fond de caisse initial (hors chiffre d'affaires)",fmt(b.fond));
   h+=ligneMarche("Sorties d'espèces"+(sortiesCaisse.length?" ("+sortiesCaisse.length+")":""),"− "+fmt(b.sorties));
   h+=ligneMarche("Espèces théoriques en caisse",fmt(theorique));
+  if(d.cloturesAnnulees&&d.cloturesAnnulees.length){
+    var prec=d.cloturesAnnulees[d.cloturesAnnulees.length-1];
+    h+=ligneMarche("Comptage précédent (sera remplacé)",fmt(prec.compte)+" · écart "+texteEcart(prec.ecart)+(prec.note?" · « "+echapperHtml(prec.note)+" »":""));
+  }
   h+="<label class='marche-champ'><span>Montant réellement compté</span><span class='cp-input-row'><input class='cp-input' id='clotureCompte' type='text' inputmode='decimal' autocomplete='off' placeholder='"+texteMontant(theorique)+"' oninput='majEcartCloture("+theorique+")'><span class='prep-unite'>€</span></span></label>";
   h+="<div class='marche-ligne'><span>Écart (compté − théorique)</span><strong class='cloture-ecart' id='clotureEcart'>—</strong></div>";
   h+="<label class='marche-champ'><span>Commentaire (facultatif, par exemple la raison d'un écart)</span><input class='cp-input cloture-note' id='clotureNote' type='text' maxlength='200' autocomplete='off'></label>";
@@ -3774,7 +3787,7 @@ function calculerBilan(p,enCours){
   var dernier=p.journees.length-1,releve=enCours?releveJournee():null;
   var jours=p.journees.map(function(j,i){
     var vivant=!!(enCours&&i===dernier&&!j.bilan);
-    return {numero:j.numero,date:j.date,cloture:j.cloture||null,enCours:vivant,
+    return {numero:j.numero,date:j.date,cloture:j.cloture||null,annulees:j.cloturesAnnulees||[],enCours:vivant,
       b:vivant?releve.bilan:(j.bilan||(j.cloture&&j.cloture.bilan)||null),
       produits:vivant?releve.produits:(j.produits||(j.cloture&&j.cloture.produits)||null)};
   });
@@ -3800,6 +3813,13 @@ function calculerBilan(p,enCours){
   produits.sort(function(a,b){return b.ca-a.ca||a.nom.localeCompare(b.nom);});
   return {jours:jours,t:t,produits:produits,quantitesConnues:quantitesConnues};
 }
+// Comptages d'une journée, du plus ancien au plus récent : remplacés (annulés si la journée est rouverte), puis le
+// comptage valide, seul compté dans l'écart du bilan.
+function comptagesJournee(j){
+  var l=j.annulees.map(function(c){return {etat:j.cloture?"Remplacé":"Annulé (journée rouverte)",c:c,remplaceLe:c.annuleeLe||null};});
+  if(j.cloture)l.push({etat:"Valide",c:j.cloture,remplaceLe:null});
+  return l;
+}
 function htmlBilan(p,enCours,indice){
   var B=calculerBilan(p,enCours),e=p.evenement,t=B.t;
   var kpi=function(l,v,s){return "<div class='marche-kpi'><div class='marche-kpi-lbl'>"+l+"</div><div class='marche-kpi-val'>"+v+"</div>"+(s?"<div class='marche-kpi-sous'>"+s+"</div>":"")+"</div>";};
@@ -3817,8 +3837,19 @@ function htmlBilan(p,enCours,indice){
       +"<td>"+(c?fmt(c.theorique):"—")+"</td><td>"+(c?fmt(c.compte):"—")+"</td><td class='"+(c?"cloture-ecart "+classeEcart(c.ecart):"")+"'>"+(c?texteEcart(c.ecart).replace(/ \(.*\)$/,""):"non clôturée")+"</td></tr>";
   });
   h+="</tbody></table></div>";
-  var notes=B.jours.filter(function(j){return j.cloture&&j.cloture.note;});
-  if(notes.length)h+="<div class='marche-texte'>"+notes.map(function(j){return "Jour "+j.numero+" : "+echapperHtml(j.cloture.note);}).join("<br>")+"</div>";
+  if(B.jours.some(function(j){return j.annulees.length;})){
+    // Journée rouverte puis clôturée à nouveau : tous les comptages, le valide indiqué, les remplacés conservés.
+    h+="<div class='cp-section-title'>Historique des comptages</div><div class='bilan-tableau-wrap'><table class='bilan-tableau'><thead><tr><th>Jour</th><th>Comptage</th><th>Théorique</th><th>Compté</th><th>Écart</th><th>Commentaire</th><th>Clôturé</th><th>Remplacé</th></tr></thead><tbody>";
+    B.jours.forEach(function(j){comptagesJournee(j).forEach(function(x){
+      h+="<tr><td>J"+j.numero+" · "+jourCourt(j.date)+"</td><td>"+(x.etat==="Valide"?"✅ Valide":x.etat)+"</td><td>"+fmt(x.c.theorique)+"</td><td>"+fmt(x.c.compte)+"</td>"
+        +"<td class='cloture-ecart "+classeEcart(x.c.ecart)+"'>"+texteEcart(x.c.ecart).replace(/ \(.*\)$/,"")+"</td><td class='note'>"+(x.c.note?echapperHtml(x.c.note):"—")+"</td>"
+        +"<td>"+dateHeure(x.c.le)+"</td><td>"+(x.remplaceLe?dateHeure(x.remplaceLe):"—")+"</td></tr>";
+    });});
+    h+="</tbody></table></div><div class='marche-texte'>Seul le comptage valide de chaque journée entre dans l'écart du bilan ; les comptages remplacés restent conservés.</div>";
+  }else{
+    var notes=B.jours.filter(function(j){return j.cloture&&j.cloture.note;});
+    if(notes.length)h+="<div class='marche-texte'>"+notes.map(function(j){return "Jour "+j.numero+" : "+echapperHtml(j.cloture.note);}).join("<br>")+"</div>";
+  }
   h+="<div class='cp-section-title'>Produits</div><div class='bilan-tableau-wrap'><table class='bilan-tableau'><thead><tr><th>Produit</th><th>Emporté</th><th>Vendu</th><th>Restant</th><th>CA</th></tr></thead><tbody>";
   B.produits.forEach(function(x){h+="<tr><td>"+echapperHtml(x.nom)+"</td><td>"+quantiteTexte(x.emporte)+"</td><td>"+(B.quantitesConnues?x.vendu:"—")+"</td><td>"+quantiteTexte(x.restant)+"</td><td>"+(B.quantitesConnues?fmt(x.ca):"—")+"</td></tr>";});
   if(!B.produits.length)h+="<tr><td colspan='5'>Aucun produit</td></tr>";
@@ -3846,6 +3877,7 @@ window.exporterBilan=function(i){
     ["Chiffre d'affaires total",t.ca],["dont espèces",t.especes],["dont SumUp",t.sumup],["Ventes",t.ventes],
     ["Objectif",p.objectif||""],["Objectif atteint (%)",p.objectif?Number((t.ca/p.objectif*100).toFixed(1)):""],
     ["Sorties d'espèces",t.sorties],["Écart de caisse (journées clôturées)",t.clotures?t.ecart:""],["Journées clôturées",t.clotures+" / "+B.jours.length],[],
+    ["Écart de caisse : seul le comptage valide de chaque journée est compté (comptages remplacés : feuille Comptages)."],
     ["Le fond de caisse n'est jamais compté dans le chiffre d'affaires."]];
   var a2=[["Jour","Date","Ventes","CA","Espèces","SumUp","Fond de caisse","Sorties","Espèces théoriques","Compté","Écart","Commentaire","Clôturée le"]];
   B.jours.forEach(function(j){var b=j.b||{},c=j.cloture;a2.push(["J"+j.numero,j.date,b.ventes||0,b.ca||0,b.especes||0,b.sumup||0,b.fond||0,b.sorties||0,c?c.theorique:"",c?c.compte:"",c?c.ecart:"",c?c.note||"":(j.enCours?"en cours":"non clôturée"),c?dateHeure(c.le):""]);});
@@ -3854,6 +3886,14 @@ window.exporterBilan=function(i){
   if(!B.quantitesConnues)a3.push([],["Quantités vendues non enregistrées pour ce marché (terminé avant la clôture détaillée)."]);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a1),"Bilan");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a2),"Journees");
+  var a4=[["Jour","Date","Comptage","Espèces théoriques","Compté","Écart","Commentaire","Clôturé le","Remplacé le"]];
+  B.jours.forEach(function(j){
+    var l=comptagesJournee(j);
+    if(!l.length)a4.push(["J"+j.numero,j.date,j.enCours?"En cours":"Non clôturée","","","","","",""]);
+    l.forEach(function(x){a4.push(["J"+j.numero,j.date,x.etat,x.c.theorique,x.c.compte,x.c.ecart,x.c.note||"",dateHeure(x.c.le),x.remplaceLe?dateHeure(x.remplaceLe):""]);});
+  });
+  a4.push([],["Seul le comptage « Valide » de chaque journée entre dans l'écart du bilan."]);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a4),"Comptages");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a3),"Produits");
   var nom=String(e.nom||"marche").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,40);
   XLSX.writeFile(wb,(DEMO?"DEMONSTRATION_":"")+"bilan_"+nom+"_"+dateLocale()+".xlsx");
@@ -3869,6 +3909,10 @@ function renderMarche(){
   h+="<span>"+(e.fictif?"Marché fictif (démonstration) : ventes sans événement SHAYA MANAGER":"Ventes rattachées à l'événement SHAYA MANAGER")+"</span></div>";
   if(peutCommencerJour()&&!d.cloture)h+="<div class='marche-alerte'>La journée du "+jourCourt(d.date)+" est toujours ouverte (rien n'a été remis à zéro). Les ventes d'aujourd'hui s'y ajoutent, mais SHAYA MANAGER les compte à leur date réelle (date comptable du "+jourCourt(dateLocale())+"). Touchez « Commencer la journée suivante » quand vous êtes prêt.</div>";
   if(d.cloture)h+="<div class='marche-alerte'>Journée clôturée à "+heure(d.cloture.le)+" : "+fmt(d.cloture.compte)+" comptés pour "+fmt(d.cloture.theorique)+" théoriques, écart "+texteEcart(d.cloture.ecart)+". Ventes bloquées jusqu'à la journée suivante ; « Rouvrir la journée » pour corriger.</div>";
+  else if(d.cloturesAnnulees&&d.cloturesAnnulees.length){
+    var anc=d.cloturesAnnulees[d.cloturesAnnulees.length-1];
+    h+="<div class='marche-alerte'>Journée rouverte : le comptage de "+heure(anc.le)+" ("+fmt(anc.compte)+", écart "+texteEcart(anc.ecart)+") est annulé et conservé dans l'historique des comptages. Clôturez à nouveau quand vous êtes prêt.</div>";
+  }
   h+="<div class='marche-grille'>"+kpi("CA du jour",fmt(b.ca),b.ventes+" vente"+(b.ventes>1?"s":""))+kpi("CA de l'événement",fmt(caEv),p.journees.length+" journée"+(p.journees.length>1?"s":""))
     +kpi("💵 Espèces (jour)",fmt(b.especes))+kpi("📱 SumUp (jour)",fmt(b.sumup))+"</div>";
   h+=kpi("Solde théorique des espèces",fmt(solde),"Fond "+fmt(fondCaisse)+" + espèces "+fmt(b.especes)+" − sorties "+fmt(b.sorties));
@@ -3879,6 +3923,8 @@ function renderMarche(){
   }else h+=kpi("Objectif de l'événement","aucun");
   h+="<div><div class='cp-section-title'>Journées</div>"+p.journees.map(function(j){
     var jb=j.bilan||(j.cloture&&j.cloture.bilan),etat=j.cloture?"clôturée · écart "+texteEcart(j.cloture.ecart):j.bilan?"non clôturée":"en cours";
+    var nbAnc=(j.cloturesAnnulees||[]).length;
+    if(nbAnc)etat+=" · "+nbAnc+" comptage"+(nbAnc>1?"s":"")+(j.cloture?" remplacé":" annulé")+(nbAnc>1?"s":"");
     return ligneMarche("Jour "+j.numero+" · "+jourCourt(j.date),(jb?fmt(jb.ca)+" · "+jb.ventes+" vente"+(jb.ventes>1?"s":"")+" · ":"")+etat);
   }).join("")+"</div>";
   el.innerHTML=h;

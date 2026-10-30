@@ -455,6 +455,31 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .prep-enregistrer{width:100%;padding:11px}
 .btn-prep{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btn-prep.preparee{border-color:rgba(46,204,143,.5);color:var(--green)}
+/* Marché ouvert : bouton de la barre du haut, tableau du marché, fenêtres d'ouverture et de journée. */
+.btn-prep.ouvert{background:rgba(46,204,143,.16);border-color:var(--green);color:var(--green);font-weight:700}
+.prep-formulaire{display:flex;flex-direction:column;gap:10px}
+.prep-formulaire[hidden],.marche-tableau[hidden]{display:none}
+.prep-provenance{color:var(--text2)}
+.prep-provenance.recue{color:var(--green)}
+.prep-ouvrir{width:100%;padding:12px;font-size:14px}
+.marche-tableau{display:flex;flex-direction:column;gap:8px}
+.marche-entete{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:var(--r-sm);background:rgba(46,204,143,.1);border:1px solid rgba(46,204,143,.35);font-size:12px;color:var(--text2)}
+.marche-entete strong{font-size:15px;color:var(--text)}
+.marche-alerte{padding:8px 10px;border-radius:var(--r-sm);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);font-size:12px;color:var(--text);line-height:1.4}
+.marche-grille{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.marche-kpi{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px}
+.marche-kpi-lbl{font-size:11px;color:var(--text2)}
+.marche-kpi-val{font-family:'DM Mono',monospace;font-size:17px;font-weight:600;color:var(--text);margin-top:2px}
+.marche-kpi-sous{font-size:11px;color:var(--text3);margin-top:2px}
+.marche-barre{height:10px;margin:6px 0}
+.marche-ligne{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--border);font-size:12px;color:var(--text2)}
+.marche-ligne strong{color:var(--text);text-align:right}
+.modal-marche{width:min(400px,calc(100% - 32px));align-items:stretch;text-align:left;gap:8px;border-color:rgba(46,204,143,.4)}
+.modal-marche .modal-reset-icon,.modal-marche .modal-reset-title{text-align:center}
+.marche-texte{font-size:12px;color:var(--text2);line-height:1.45}
+.marche-champ{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text2);margin-top:4px}
+.marche-case{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text);line-height:1.4}
+.marche-case input{margin-top:2px;width:18px;height:18px;flex-shrink:0}
 /* Caisse ouverte depuis l'écran d'accueil de l'iPad (« black-translucent ») : la page passe sous l'heure et la
    batterie. Bordures couleur du fond plutôt que marges, pour que les panneaux latéraux commencent eux aussi
    sous la barre d'état. Valeurs nulles dans Safari et sur PC. */
@@ -525,6 +550,8 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
   /* Préparer un marché */
   .prep-panel{width:min(460px,100%)}
   .prep-select{min-height:44px;font-size:16px}
+  .marche-kpi-val{font-size:19px}
+  .modal-marche .cp-input{min-height:44px}
 }
 /* Paysage (iPad, hauteur suffisante) : le panier prend toute la hauteur à droite, la barre du haut ne couvre
    que le catalogue. Remise et code promo côte à côte. Les téléphones à l'horizontale gardent la disposition
@@ -692,12 +719,15 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
 
 <!-- Préparer un marché : faite la veille, gardée sur l'appareil, appliquée seulement à l'ouverture du marché -->
 <div class="prep-panel" id="prepPanel">
-  <div class="cp-header"><h3>🗓️ Préparer un marché</h3><button class="btn-sm" onclick="togglePreparation()">✕</button></div>
+  <div class="cp-header"><h3 id="prepTitre">🗓️ Préparer un marché</h3><button class="btn-sm" onclick="togglePreparation()">✕</button></div>
   <div class="cp-body">
+    <div class="marche-tableau" id="marcheTableau" hidden></div>
+    <div class="prep-formulaire" id="prepFormulaire">
     <div class="prep-etat" id="prepEtat"></div>
     <div><div class="cp-section-title">1. Événement (SHAYA MANAGER)</div>
       <select class="cp-input prep-select" id="prepEvenement" onchange="prepEvenementChoisi()"></select>
       <div class="prep-aide" id="prepEvenementInfo"></div>
+      <div class="prep-aide prep-provenance" id="prepProvenance"></div>
     </div>
     <div class="prep-deux">
       <div><div class="cp-section-title">2. Fond de caisse</div>
@@ -712,11 +742,16 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
       <div class="prep-total" id="prepTotal"></div>
       <div class="prep-liste" id="prepListe"></div>
     </div>
+    </div>
     <details class="prep-historique" id="prepHistorique" hidden></details>
   </div>
   <div class="prep-footer">
-    <button class="cp-btn prep-enregistrer" onclick="enregistrerPreparation()">Enregistrer la préparation</button>
+    <button class="cp-btn prep-ouvrir" id="prepOuvrir" onclick="demanderOuverture()" hidden>▶ Ouvrir le marché</button>
+    <button class="cp-btn prep-enregistrer" id="prepEnregistrer" onclick="enregistrerPreparation()">Enregistrer la préparation</button>
     <button class="sp-reset-btn" id="prepAbandonner" onclick="abandonnerPreparation()" hidden>Abandonner la préparation</button>
+    <button class="cp-btn prep-ouvrir" id="marcheJourSuivant" onclick="ouvrirModalJourSuivant()" hidden>🌅 Commencer la journée suivante</button>
+    <button class="sp-reset-btn" id="marcheAnnuler" onclick="annulerOuverture()" hidden>Annuler l'ouverture</button>
+    <button class="sp-reset-btn" id="marcheTerminer" onclick="demanderFinMarche()" hidden>🏁 Terminer le marché</button>
   </div>
 </div>
 
@@ -921,6 +956,8 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
   <div class="ep-body" id="epBody"><div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Aucune vente pour le moment</div></div>
 </div>
 
+<!-- Marché : ouverture, journée suivante, fin (contenu écrit par le script, toujours sur confirmation) -->
+<div class="modal-overlay-reset" id="modalMarche"><div class="modal-reset modal-marche" id="modalMarcheContenu"></div></div>
 <!-- Contrôle du stock avant encaissement : rien n'est encaissé, l'ajustement est décidé par vous -->
 <div class="modal-overlay-reset" id="modalStock">
   <div class="modal-reset modal-stock">
@@ -1605,7 +1642,8 @@ function restaurer(){
     var data=JSON.parse(raw);
     var today=aujourdhui();
     journeeDu=data.date||today;
-    if(data.date!==today){
+    // Marché ouvert : la journée n'est jamais archivée à minuit (journée suivante sur confirmation).
+    if(data.date!==today&&!marcheOuvert()){
       // Nouveau jour calendaire : la journée précédente est d'abord archivée sur l'appareil (SHAYA).
       // Stock, produits masqués, codes promo et objectif sont conservés, comme avec le bouton « Nouveau jour ».
       if(archiverDonnees(data,"changement-de-date")){
@@ -1658,18 +1696,15 @@ function restaurer(){
 function verifierChangementDeJour(){
   var today=aujourdhui();
   if(!journeeDu||journeeDu===today||archiveImpossible)return false;
+  // Marché ouvert : jamais d'archivage ni de remise à zéro à minuit ; la journée suivante se commence sur confirmation.
+  if(marcheOuvert()){proposerJourSuivant();return false;}
   var veille=journeeDu;
-  if(!archiverDonnees({date:veille,tickets:tickets,salesData:salesData,autresVentes:autresVentes,sortiesCaisse:sortiesCaisse,
-      fondCaisse:fondCaisse,donsTombola:donsTombola,gainsObjets:gainsObjets,wheelGains:wheelGains},"changement-de-date")){
+  if(!archiverJourneeEnCours("changement-de-date")){
     archiveImpossible=veille;
     showToast("⚠️ Journée du "+veille+" toujours ouverte (archivage impossible) : exportez-la en Excel puis faites « Nouveau jour »");
     return false;
   }
-  tickets=[];totalCA=0;wheelGains=[];clients=[];
-  fondCaisse=0;sortiesCaisse=[];autresVentes=[];donsTombola=[];gainsObjets=[];
-  salesData={};
-  PRODUCTS.forEach(function(p){salesData[p.id]={name:p.label,cat:p.cat,emoji:p.emoji,price:p.price,qty:0,ca:0};});
-  journeeDu=today;
+  viderJournee();
   sauvegarder();
   document.getElementById("nbVentes").textContent="0";
   document.getElementById("caJour").textContent=fmt(0);
@@ -1679,6 +1714,20 @@ function verifierChangementDeJour(){
   if(typeof updateObjectifBar==="function")updateObjectifBar();
   showToast("📅 Nouvelle journée : celle du "+veille+" est archivée, stock conservé");
   return true;
+}
+
+// Journée en cours archivée sur l'appareil (sans les coordonnées des gagnants), puis vidée : stock, produits
+// masqués, codes promo, objectif et panier en cours ne changent pas.
+function archiverJourneeEnCours(motif){
+  return archiverDonnees({date:journeeDu||aujourdhui(),tickets:tickets,salesData:salesData,autresVentes:autresVentes,sortiesCaisse:sortiesCaisse,
+    fondCaisse:fondCaisse,donsTombola:donsTombola,gainsObjets:gainsObjets,wheelGains:wheelGains},motif);
+}
+function viderJournee(){
+  tickets=[];totalCA=0;wheelGains=[];clients=[];
+  fondCaisse=0;sortiesCaisse=[];autresVentes=[];donsTombola=[];gainsObjets=[];
+  salesData={};
+  PRODUCTS.forEach(function(p){salesData[p.id]={name:p.label,cat:p.cat,emoji:p.emoji,price:p.price,qty:0,ca:0};});
+  journeeDu=aujourdhui();archiveImpossible=null;
 }
 
 // Protection rechargement
@@ -1873,6 +1922,8 @@ window.selectMode=function(mode){
 window.confirmerPaiement=function(){
   if(!cart.length||!payMode)return;
   verifierChangementDeJour();
+  // Marché sur plusieurs jours : nouvelle date, journée suivante commencée ou journée poursuivie sur décision.
+  if(jourAOuvrir()){window.ouvrirModalJourSuivant();return;}
   // Quantités vérifiées avant chaque encaissement : rien n'est encaissé au-delà du stock (SHAYA).
   var horsStock=lignesHorsStock();
   if(horsStock.length){ouvrirControleStock(horsStock);return;}
@@ -1981,6 +2032,7 @@ function renderStockPanel(){
 // Stock d'un produit modifié : catalogue, panneau et panier à jour ; un panier qui dépasse est signalé.
 function definirStock(id,valeur){
   stockData[id]=valeur;
+  noterModificationMarche("stock",[id]);
   renderStockPanel();renderProducts();renderCart();sauvegarder();
   signalerPanierHorsStock();
 }
@@ -2010,6 +2062,7 @@ window.rendreStockIllimite=function(id){
 window.resetAllStock=function(){
   if(!confirm("Remettre le stock de tous les produits à 0 ?\nIls seront tous épuisés et masqués du catalogue, stocks illimités compris."))return;
   PRODUCTS.forEach(function(p){stockData[p.id]=0;});
+  noterModificationMarche("stock",PRODUCTS.map(function(p){return p.id;}));
   renderStockPanel();renderProducts();renderCart();sauvegarder();
   signalerPanierHorsStock();
   showToast("Stock remis à zéro");
@@ -2215,7 +2268,15 @@ window.annulerTicket=function(uid){
 
 window.toggleTickets=function(){document.getElementById("ticketPanel").classList.toggle("open");};
 window.toggleExcel=function(){document.getElementById("excelPanel").classList.toggle("open");renderExcelPanel();};
-window.askReset=function(){document.getElementById("modalReset").classList.add("open");};
+window.askReset=function(){
+  // Marché ouvert : la journée suivante se commence depuis le marché (stock restant et bilan du jour gardés).
+  if(marcheOuvert()){
+    showToast("Marché ouvert : utilisez 🗓️ pour commencer la journée suivante ou terminer le marché");
+    if(!document.getElementById("prepPanel").classList.contains("open"))window.togglePreparation();
+    return;
+  }
+  document.getElementById("modalReset").classList.add("open");
+};
 window.closeReset=function(){document.getElementById("modalReset").classList.remove("open");};
 window.doReset=function(){
   // Archiver la journée sur l'appareil avant de la vider (SHAYA) : aucune vente n'est perdue.
@@ -2344,6 +2405,7 @@ window.stopOffreFlash=function(){
 window.toggleProduct=function(id){
   if(disabledProducts[id])delete disabledProducts[id];
   else disabledProducts[id]=true;
+  noterModificationMarche("masques",[id]);
   renderStockPanel();renderProducts();sauvegarder();
   var p=PRODUCTS.find(function(x){return x.id===id;});
   if(p)showToast(disabledProducts[id]?"🚫 "+p.label+" désactivé":"✅ "+p.label+" activé");
@@ -2351,12 +2413,14 @@ window.toggleProduct=function(id){
 window.enableAllProducts=function(){
   if(!window.confirm("Réactiver tous les produits du catalogue ?\nLes produits que vous aviez désactivés réapparaîtront."))return;
   disabledProducts={};
+  noterModificationMarche("masques",PRODUCTS.map(function(p){return p.id;}));
   renderStockPanel();renderProducts();sauvegarder();
   showToast("✅ Tous les produits activés !");
 };
 window.disableAllProducts=function(){
   if(!window.confirm("Désactiver tous les produits ?\nLe catalogue sera vide jusqu'à leur réactivation."))return;
   PRODUCTS.forEach(function(p){disabledProducts[p.id]=true;});
+  noterModificationMarche("masques",PRODUCTS.map(function(p){return p.id;}));
   renderStockPanel();renderProducts();sauvegarder();
   showToast("🚫 Tous les produits désactivés");
 };
@@ -2714,6 +2778,11 @@ var syncEtat={dernier:(function(){try{var d=localStorage.getItem(DERNIER_ECHANGE
 
 function dateLocale(d){d=d||new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);}
 function evenementDuJour(){
+  // Marché ouvert : son événement SHAYA MANAGER vaut pour toutes ses journées et ses ventes (marché fictif : aucun).
+  if(marcheOuvert()){
+    var m=preparation||JSON.parse(localStorage.getItem(PREPARATION_CLE)||"null");
+    return m&&m.evenement&&m.evenement.id?{date:dateLocale(),id:m.evenement.id,nom:m.evenement.nom}:null;
+  }
   try{var e=JSON.parse(localStorage.getItem(EVENEMENT_CLE)||"null");return e&&e.date===dateLocale()?e:null;}catch(x){return null;}
 }
 function evenementCourant(){var e=evenementDuJour();return e?e.id:null;}
@@ -3066,6 +3135,7 @@ window.oublierConnexion=function(){
 };
 
 var EVENEMENTS_CLE=DEMO?ESPACE_DEMO+"evenements":"shaya_caisse_evenements";   // dernière liste reçue, pour un choix hors ligne
+var EVENEMENTS_RECUS_CLE=DEMO?ESPACE_DEMO+"evenements_recus_le":"shaya_caisse_evenements_recus_le";   // date de cette réception
 function evenementsLocaux(){try{var l=JSON.parse(localStorage.getItem(EVENEMENTS_CLE)||"[]");return Array.isArray(l)?l:[];}catch(e){return [];}}
 function chargerEvenements(){
   var sel=document.getElementById("syncEvenement"),info=document.getElementById("syncEvenementInfo");
@@ -3080,22 +3150,30 @@ function chargerEvenements(){
     });
     if(courant&&!liste.some(function(e){return e.id===courant.id;}))h+="<option value='"+courant.id+"'>"+courant.nom.replace(/</g,"&lt;")+"</option>";
     sel.innerHTML=h;sel.value=courant?courant.id:"";
+    sel.disabled=marcheOuvert();
     if(info)info.textContent=courant?"Les prochaines ventes sont rattachées à cet événement. Une vente déjà encaissée garde le sien (correction dans SHAYA MANAGER).":"Aucun événement choisi : les prochaines ventes sont des ventes hors événement (POS).";
+    if(info&&marcheOuvert())info.textContent="Marché ouvert : toutes ses ventes sont rattachées à son événement (voir 🗓️).";
   };
-  obtenirEvenements().then(remplir);
+  obtenirEvenements().then(function(r){remplir(r.liste);});
 }
-// Événements de SHAYA MANAGER : liste reçue (gardée pour un choix hors ligne), sinon dernière liste gardée.
+// Événements de SHAYA MANAGER : liste reçue (gardée avec sa date pour un choix hors ligne), sinon dernière liste
+// gardée. Résultat : {liste, source « shaya » ou « copie », raison de la copie, recueLe}.
 function obtenirEvenements(){
-  if(!syncConnexion||navigator.onLine===false)return Promise.resolve(evenementsLocaux());
+  var copie=function(raison){var le=null;try{le=localStorage.getItem(EVENEMENTS_RECUS_CLE);}catch(e){}return {liste:evenementsLocaux(),source:"copie",raison:raison,recueLe:le};};
+  if(!syncConnexion)return Promise.resolve(copie("non-connectee"));
+  if(navigator.onLine===false)return Promise.resolve(copie("hors-ligne"));
   return appelApi("GET","/evenements").then(function(rep){
-    if(rep.statut===200){var l=rep.corps.evenements||[];try{localStorage.setItem(EVENEMENTS_CLE,JSON.stringify(l));}catch(e){}return l;}
-    return evenementsLocaux();
-  },function(){return evenementsLocaux();});
+    if(rep.statut!==200)return copie("injoignable");
+    var l=rep.corps.evenements||[],le=new Date().toISOString();
+    try{localStorage.setItem(EVENEMENTS_CLE,JSON.stringify(l));localStorage.setItem(EVENEMENTS_RECUS_CLE,le);}catch(e){}
+    return {liste:l,source:"shaya",raison:null,recueLe:le};
+  },function(){return copie("injoignable");});
 }
 // Jamais rétroactif : l'événement choisi vaut pour les ventes suivantes. Les ventes du jour encaissées
 // sans événement peuvent y être rattachées, sur confirmation ; une vente déjà rattachée à un
 // événement le garde (toute autre correction se fait dans SHAYA MANAGER, où elle est tracée).
 window.choisirEvenement=function(id){
+  if(marcheOuvert()){showToast("Marché ouvert : ses ventes restent rattachées à son événement");chargerEvenements();return;}
   var sel=document.getElementById("syncEvenement");
   var opt=sel?sel.options[sel.selectedIndex]:null;
   var nom=opt?opt.textContent.replace(/^● /,""):"";
@@ -3149,8 +3227,10 @@ function sauverPreparation(){
 function archiverPreparation(motif,le){historiquePreparations.push(Object.assign({},preparation,{motif:motif,archiveeLe:le}));}
 function majBoutonPreparation(){
   var b=document.getElementById("btnPreparation");if(!b)return;
-  b.textContent=preparation?"🗓️ Préparé : "+preparation.evenement.nom:"🗓️ Préparer un marché";
-  b.classList.toggle("preparee",!!preparation);
+  var ouvert=marcheOuvert()&&!!preparation;
+  b.textContent=ouvert?"🟢 "+preparation.evenement.nom+" · "+libelleJour(true):preparation?"🗓️ Préparé : "+preparation.evenement.nom:"🗓️ Préparer un marché";
+  b.classList.toggle("preparee",!!preparation&&!ouvert);
+  b.classList.toggle("ouvert",ouvert);
 }
 function dateCourte(iso){
   if(!iso)return "";var p=iso.split("-");
@@ -3175,6 +3255,12 @@ window.togglePreparation=function(){
 };
 window.prepModifiee=function(){if(prepForm)prepForm.modifie=true;};
 function ouvrirFormulairePreparation(){
+  // Marché ouvert : tableau du marché à la place du formulaire (la préparation n'est plus modifiable).
+  var ouvert=marcheOuvert();
+  document.getElementById("prepTitre").textContent=ouvert?"🟢 Marché en cours":"🗓️ Préparer un marché";
+  document.getElementById("prepFormulaire").hidden=ouvert;
+  document.getElementById("marcheTableau").hidden=!ouvert;
+  if(ouvert){prepForm=null;renderMarche();renderHistoriquePreparations();majBoutonsPanneau();return;}
   var base=preparation;
   prepForm={quantites:{},evenements:[],modifie:false};
   PRODUCTS.forEach(function(p){
@@ -3185,12 +3271,14 @@ function ouvrirFormulairePreparation(){
   document.getElementById("prepObjectif").value=base?texteMontant(base.objectif):"";
   renderEtatPreparation();renderListePreparation();renderHistoriquePreparations();
   remplirEvenementsPreparation(base?base.evenement:null);
+  majBoutonsPanneau();
 }
 function remplirEvenementsPreparation(choisi){
   var sel=document.getElementById("prepEvenement");
   sel.innerHTML="<option value=''>Chargement…</option>";
-  obtenirEvenements().then(function(liste){
+  obtenirEvenements().then(function(r){
     if(!prepForm)return;
+    var liste=r.liste;afficherProvenance(r);
     var aujourdHui=dateLocale();
     // Événements en cours ou à venir : un événement terminé ne se prépare plus.
     var utiles=liste.filter(function(e){return e&&e.id&&e.nom&&(e.fin||e.debut)>=aujourdHui;});
@@ -3308,11 +3396,12 @@ window.enregistrerPreparation=function(){
     prepareeLe:meme?preparation.prepareeLe:maintenant,modifieeLe:meme?maintenant:null,demonstration:DEMO};
   var ok=sauverPreparation();
   prepForm.modifie=false;
-  majBoutonPreparation();renderEtatPreparation();renderHistoriquePreparations();
+  majBoutonPreparation();renderEtatPreparation();renderHistoriquePreparations();majBoutonsPanneau();
   showToast(ok?"✅ Préparation enregistrée : "+ev.nom:"⚠️ Copie locale impossible : préparation gardée seulement dans le stockage de l'appareil");
 };
 window.abandonnerPreparation=function(){
   if(!preparation){showToast("Aucune préparation enregistrée");return;}
+  if(marcheOuvert()){showToast("Marché ouvert : terminez-le depuis le tableau du marché");return;}
   if(!window.confirm("Abandonner la préparation de « "+preparation.evenement.nom+" » ?\nElle est gardée dans l'historique ; la caisse n'est pas modifiée."))return;
   archiverPreparation("abandonnee",new Date().toISOString());
   preparation=null;sauverPreparation();
@@ -3321,7 +3410,7 @@ window.abandonnerPreparation=function(){
 };
 function renderEtatPreparation(){
   var el=document.getElementById("prepEtat"),ab=document.getElementById("prepAbandonner");if(!el)return;
-  if(ab)ab.hidden=!preparation;
+  if(ab)ab.hidden=!preparation||marcheOuvert();
   if(!preparation){
     el.className="prep-etat";
     el.textContent="Aucune préparation enregistrée. Choisissez l'événement, puis indiquez le fond de caisse, l'objectif et les quantités emportées.";
@@ -3331,7 +3420,7 @@ function renderEtatPreparation(){
   el.innerHTML="<strong>Préparé : "+echapperHtml(preparation.evenement.nom)+"</strong><br>Préparation du "+dateHeure(preparation.prepareeLe)
     +(preparation.modifieeLe?", modifiée le "+dateHeure(preparation.modifieeLe):"")
     +"<br>Fond de caisse "+fmt(preparation.fondCaisse)+" · objectif "+(preparation.objectif?fmt(preparation.objectif):"aucun")
-    +"<br>Elle sera appliquée à l'ouverture du marché (prochaine étape). D'ici là, rien ne change dans la caisse.";
+    +"<br>Le jour du marché, touchez « ▶ Ouvrir le marché ». D'ici là, rien ne change dans la caisse.";
 }
 function renderHistoriquePreparations(){
   var el=document.getElementById("prepHistorique");if(!el)return;
@@ -3339,9 +3428,275 @@ function renderHistoriquePreparations(){
   if(!historiquePreparations.length)return;
   var h="<summary>Historique : "+historiquePreparations.length+" préparation"+(historiquePreparations.length>1?"s":"")+" gardée"+(historiquePreparations.length>1?"s":"")+"</summary><ul>";
   historiquePreparations.slice().reverse().forEach(function(p){
-    h+="<li>"+echapperHtml(p.evenement.nom)+" — "+(p.motif==="remplacee"?"remplacée":"abandonnée")+" le "+dateHeure(p.archiveeLe)+" (fond "+fmt(p.fondCaisse)+", objectif "+(p.objectif?fmt(p.objectif):"aucun")+")</li>";
+    var motif={remplacee:"préparation remplacée",abandonnee:"préparation abandonnée","ouverture-annulee":"ouverture annulée",terminee:"marché terminé"}[p.motif]||p.motif;
+    var detail=p.motif==="terminee"&&p.journees?" · "+p.journees.length+" journée"+(p.journees.length>1?"s":"")+" · CA "+fmt(p.caEvenement||0)+(p.objectif?" sur "+fmt(p.objectif):"")
+      :" (fond "+fmt(p.fondCaisse)+", objectif "+(p.objectif?fmt(p.objectif):"aucun")+")";
+    h+="<li>"+echapperHtml(p.evenement.nom)+" — "+motif+" le "+dateHeure(p.archiveeLe)+detail+"</li>";
   });
   el.innerHTML=h+"</ul>";
+}
+
+// ── MARCHÉ OUVERT (SHAYA) : ouverture, journées, fin ─────────────────────────────────────────────
+// Une seule préparation active. L'ouverture (sur confirmation) applique les quantités emportées (produits non
+// emportés masqués), le fond du jour et l'objectif de l'événement ; l'état d'avant l'ouverture est gardé
+// dans la préparation. Toutes les ventes du marché portent l'identifiant de son événement SHAYA MANAGER. Un
+// marché ouvert n'est jamais archivé ni remis à zéro à minuit : la journée suivante se commence sur
+// confirmation (stock restant conservé, fond du jour confirmé). À la fin du marché, son bilan rejoint
+// l'historique ; une ancienne préparation n'est jamais réactivée.
+var jourSuivantPropose=null;
+function marcheOuvert(){
+  if(preparation)return preparation.statut==="ouverte";
+  try{var p=JSON.parse(localStorage.getItem(PREPARATION_CLE)||"null");return !!p&&p.statut==="ouverte";}catch(e){return false;}
+}
+function copieProfonde(o){return JSON.parse(JSON.stringify(o));}
+// Correction volontaire pendant un marché (stock ou affichage d'un produit) : notée, pour ne jamais être écrasée
+// à la fin du marché.
+function noterModificationMarche(type,ids){
+  if(!marcheOuvert()||!preparation||!preparation.ouverture)return;
+  var m=preparation.ouverture.modifies||(preparation.ouverture.modifies={stock:{},masques:{}});
+  ids.forEach(function(id){m[type][id]=true;});
+  sauverPreparation();
+}
+function pourcent(x){return x.toFixed(1).replace(".",",")+" %";}
+function heure(iso){return new Date(iso).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}
+function jourCourt(iso){var p=iso.split("-");return new Date(+p[0],p[1]-1,+p[2]).toLocaleDateString("fr-FR",{weekday:"short",day:"2-digit",month:"2-digit"});}
+function ligneMarche(l,v){return "<div class='marche-ligne'><span>"+l+"</span><strong>"+v+"</strong></div>";}
+function nbJoursEvenement(e){return e&&e.debut&&e.fin?Math.max(1,Math.round((new Date(e.fin)-new Date(e.debut))/86400000)+1):1;}
+function journeeMarche(){var j=preparation&&preparation.journees;return j&&j.length?j[j.length-1]:null;}
+function libelleJour(court){
+  var j=preparation.journees.length,n=nbJoursEvenement(preparation.evenement);
+  return (court?"J":"Jour ")+j+(n>1&&j<=n?"/"+n:"");
+}
+function peutCommencerJour(){var d=marcheOuvert()&&journeeMarche();return !!d&&d.date!==dateLocale();}
+function jourAOuvrir(){return peutCommencerJour()&&preparation.continuerLe!==dateLocale();}
+function proposerJourSuivant(){if(!jourAOuvrir()||jourSuivantPropose===dateLocale())return;jourSuivantPropose=dateLocale();window.ouvrirModalJourSuivant();}
+function sessionNonVide(){return journeeNonVide(donneesJournee({tickets:tickets,autresVentes:autresVentes,sortiesCaisse:sortiesCaisse,donsTombola:donsTombola,gainsObjets:gainsObjets}));}
+// Bilan de la journée en cours : ventes non annulées, espèces et SumUp séparés, sorties, fond.
+function bilanJournee(){
+  var b={ventes:0,ca:0,especes:0,sumup:0,sorties:0,fond:fondCaisse};
+  ticketsEncaisses().forEach(function(t){b.ventes++;b.ca+=t.total;if(t.mode==="Espèces")b.especes+=t.total;else if(t.mode==="SumUp")b.sumup+=t.total;});
+  b.sorties=sortiesCaisse.reduce(function(s,v){return s+v.montant;},0);
+  b.ca=arrondi(b.ca);b.especes=arrondi(b.especes);b.sumup=arrondi(b.sumup);b.sorties=arrondi(b.sorties);
+  return b;
+}
+// Chiffre d'affaires de l'événement : journées terminées (bilan gardé) + journée en cours.
+function caEvenement(){
+  var c=totalCA;(preparation&&preparation.journees||[]).forEach(function(j){if(j.bilan)c+=j.bilan.ca;});
+  return arrondi(c);
+}
+function rafraichirCaisse(){
+  totalCA=caEncaisse();
+  document.getElementById("nbVentes").textContent=ticketsEncaisses().length;
+  document.getElementById("caJour").textContent=fmt(totalCA);
+  document.getElementById("caTotal").textContent=fmt(totalCA);
+  var f=document.getElementById("cpFond");if(f)f.value=fondCaisse||"";
+  var o=document.getElementById("cpObjectif");if(o)o.value=objectifCA||"";
+  renderProducts();renderStockPanel();renderCart();updateTotals();renderTickets();renderExcelPanel();
+  renderCaisse();renderAutres();renderDons();majBoutonPreparation();
+  if(document.getElementById("prepPanel").classList.contains("open"))ouvrirFormulairePreparation();
+}
+function ouvrirModalMarche(h){document.getElementById("modalMarcheContenu").innerHTML=h;document.getElementById("modalMarche").classList.add("open");}
+window.fermerModalMarche=function(){document.getElementById("modalMarche").classList.remove("open");};
+function champFond(n,valeur){
+  return "<label class='marche-champ'><span>Fond de caisse du jour "+n+" (espèces de départ, hors chiffre d'affaires)</span><span class='cp-input-row'>"
+    +"<input class='cp-input' id='marcheFond' type='text' inputmode='decimal' autocomplete='off' value='"+texteMontant(valeur)+"'><span class='prep-unite'>€</span></span></label>";
+}
+function ventesSansEvenementDuJour(){var auj=dateLocale();return tickets.filter(function(t){return t.statut!=="annule"&&t.encaisseLe&&dateLocale(new Date(t.encaisseLe))===auj&&!t.evenementId;});}
+
+// Ouverture : une seule fois, sur confirmation ; jamais sur une préparation modifiée et non enregistrée.
+window.demanderOuverture=function(){
+  if(!preparation||preparation.statut!=="preparee"){showToast("Aucune préparation à ouvrir");return;}
+  if(prepForm&&prepForm.modifie){showToast("Enregistrez d'abord la préparation");return;}
+  var p=preparation,e=p.evenement,auj=dateLocale(),n=nbJoursEvenement(e);
+  var emportes=0,articles=0,illimites=0;
+  PRODUCTS.forEach(function(x){var q=p.quantites[x.id];if(q>0){emportes++;if(stockIllimite(q))illimites++;else articles+=q;}});
+  var h="<div class='modal-reset-icon'>▶</div><div class='modal-reset-title'>Ouvrir le marché</div>";
+  h+=ligneMarche("Événement",echapperHtml(e.nom)+(e.fictif?" (fictif)":""));
+  h+=ligneMarche("Journée","Jour 1"+(n>1?"/"+n:"")+" · "+jourCourt(auj));
+  if(e.debut&&(auj<e.debut||auj>(e.fin||e.debut)))h+="<div class='marche-alerte'>⚠️ Cet événement a lieu "+(e.fin&&e.fin!==e.debut?"du "+jourCourt(e.debut)+" au "+jourCourt(e.fin):"le "+jourCourt(e.debut))+" : nous sommes le "+jourCourt(auj)+".</div>";
+  h+=ligneMarche("Objectif de l'événement",p.objectif?fmt(p.objectif):"aucun");
+  h+=ligneMarche("Produits emportés",emportes+" ("+articles+" article"+(articles>1?"s":"")+(illimites?" + "+illimites+" illimité"+(illimites>1?"s":""):"")+")");
+  h+=champFond(1,p.fondCaisse);
+  h+="<div class='marche-texte'>Le stock de la caisse est remplacé par les quantités emportées et les produits non emportés sont masqués. Le stock, les produits masqués, le fond et l'objectif actuels sont gardés : « Annuler l'ouverture » les rétablit tant qu'aucune vente n'est faite.</div>";
+  if(sessionNonVide()){
+    // Ventes déjà enregistrées : détaillées avant tout archivage, qui doit être confirmé (case à cocher).
+    var enc=ticketsEncaisses(),pl=enc.length>1?"s":"",annulees=tickets.length-enc.length;
+    var sansEv=enc.filter(function(t){return !t.evenementId;}).length,autreEv=enc.filter(function(t){return t.evenementId&&t.evenementId!==e.id;}).length;
+    h+="<div class='marche-alerte'><strong>Journée en cours (du "+(journeeDu||aujourdhui())+") : "+enc.length+" vente"+pl+" pour "+fmt(totalCA)+"</strong>"
+      +(sansEv?"<br>• "+sansEv+" sans événement":"")+(autreEv?"<br>• "+autreEv+" rattachée"+(autreEv>1?"s":"")+" à un autre événement : "+(autreEv>1?"elles le gardent":"elle le garde"):"")
+      +(annulees?"<br>• "+annulees+" vente"+(annulees>1?"s":"")+" annulée"+(annulees>1?"s":"")+", gardée"+(annulees>1?"s":"")+" dans l'historique":"")
+      +(sortiesCaisse.length||autresVentes.length||donsTombola.length||gainsObjets.length?"<br>• sorties de caisse, dons ou gains notés : archivés avec la journée":"")
+      +"<br>Elles seront archivées sur l'iPad : rien n'est perdu, leur envoi à SHAYA MANAGER ne change pas, et elles ne comptent pas dans le marché.</div>";
+    h+="<label class='marche-case'><input type='checkbox' id='marcheArchiver'> J'ai vérifié : archiver ces "+enc.length+" vente"+pl+" ("+fmt(totalCA)+") et ouvrir le marché</label>";
+  }
+  var sans=ventesSansEvenementDuJour();
+  if(sans.length&&e.id)h+="<label class='marche-case'><input type='checkbox' id='marcheRattacher'> Facultatif : rattacher aussi à « "+echapperHtml(e.nom)+" » les "+sans.length+" vente(s) encaissée(s) aujourd'hui sans événement (les ventes d'un autre événement ne changent pas)</label>";
+  h+="<div class='modal-reset-btns'><button class='cancel' onclick='fermerModalMarche()'>Annuler</button><button class='confirm' onclick='confirmerOuverture()'>▶ Ouvrir</button></div>";
+  ouvrirModalMarche(h);
+};
+window.confirmerOuverture=function(){
+  if(!preparation||preparation.statut!=="preparee"){window.fermerModalMarche();return;}   // jamais deux ouvertures
+  var fond=lireMontant("marcheFond");
+  if(fond===null){showToast("Fond de caisse invalide (exemple : 150 ou 150,50)");return;}
+  var caseA=document.getElementById("marcheArchiver");
+  if(caseA&&!caseA.checked){showToast("Cochez la case pour confirmer l'archivage des ventes de la journée en cours");return;}
+  var p=preparation,e=p.evenement,auj=dateLocale(),maintenant=new Date().toISOString();
+  var caseR=document.getElementById("marcheRattacher");
+  if(caseR&&caseR.checked&&e.id){
+    var sans=ventesSansEvenementDuJour();
+    sans.forEach(function(t){t.evenementId=e.id;});
+    sauvegarder();
+    mettreEnFileJournee(auj,e.id,sans.filter(transmissible).map(function(t){return t.uid;}));
+  }
+  var avant={stock:copieProfonde(stockData),masques:copieProfonde(disabledProducts),fond:fondCaisse,objectif:objectifCA,journee:journeeDu};
+  // Aucune vente perdue : si la journée en cours ne peut pas être archivée, le marché ne s'ouvre pas.
+  if(sessionNonVide()&&!archiverJourneeEnCours("ouverture-marche")){showToast("⚠️ Journée en cours non archivée : marché non ouvert. Exportez-la en Excel, puis réessayez.");return;}
+  viderJournee();
+  // Produits emportés : quantité préparée (∞ = illimité) ; produits non emportés : masqués, stock 0.
+  PRODUCTS.forEach(function(x){
+    var q=p.quantites[x.id];
+    if(q>0){stockData[x.id]=q;delete disabledProducts[x.id];}
+    else{stockData[x.id]=0;disabledProducts[x.id]=true;}
+  });
+  fondCaisse=fond;objectifCA=p.objectif||0;
+  p.statut="ouverte";p.ouverture={le:maintenant,avant:avant};
+  p.journees=[{numero:1,date:auj,ouverteLe:maintenant,fond:fond}];
+  delete p.continuerLe;
+  var ok=sauverPreparation();sauvegarder();
+  window.fermerModalMarche();rafraichirCaisse();
+  showToast(ok?"▶ Marché ouvert : "+e.nom+" — jour 1":"⚠️ Marché ouvert, mais la copie locale a échoué");
+};
+
+// Journée suivante : jamais d'elle-même ; stock restant conservé, fond du jour confirmé, bilan de la veille gardé.
+window.ouvrirModalJourSuivant=function(){
+  if(!peutCommencerJour()){showToast("La journée d'aujourd'hui est déjà ouverte");return;}
+  var p=preparation,d=journeeMarche(),b=bilanJournee(),n=p.journees.length+1;
+  var h="<div class='modal-reset-icon'>🌅</div><div class='modal-reset-title'>Nouvelle journée — "+echapperHtml(p.evenement.nom)+"</div>";
+  h+="<div class='marche-texte'>La journée du "+jourCourt(d.date)+" (jour "+d.numero+") est toujours ouverte : rien n'a été remis à zéro.</div>";
+  h+=ligneMarche("Journée du "+jourCourt(d.date),b.ventes+" vente"+(b.ventes>1?"s":"")+" · "+fmt(b.ca));
+  h+=ligneMarche("Stock restant","conservé pour le jour "+n);
+  h+=ligneMarche("Objectif de l'événement",p.objectif?fmt(p.objectif):"aucun");
+  h+=champFond(n,p.fondCaisse);
+  h+="<div class='marche-texte'>« Commencer le jour "+n+" » archive la journée du "+jourCourt(d.date)+" sur l'iPad (rien n'est perdu). « Continuer » ajoute les prochaines ventes à cette journée (marché tard le soir).</div>";
+  h+="<div class='marche-alerte'>À savoir : avec « Continuer », les ventes faites après minuit restent dans la journée de caisse du "+jourCourt(d.date)+", mais SHAYA MANAGER les compte à leur date réelle (date comptable du "+jourCourt(dateLocale())+"). Le chiffre d'affaires de l'événement ne change pas.</div>";
+  h+="<div class='modal-reset-btns'><button class='cancel' onclick='continuerJourneeMarche()'>Continuer le "+jourCourt(d.date)+"</button><button class='confirm' onclick='commencerJourSuivant()'>Commencer le jour "+n+"</button></div>";
+  ouvrirModalMarche(h);
+};
+window.commencerJourSuivant=function(){
+  if(!peutCommencerJour()){window.fermerModalMarche();return;}   // une seule journée par date
+  var fond=lireMontant("marcheFond");
+  if(fond===null){showToast("Fond de caisse invalide (exemple : 150 ou 150,50)");return;}
+  var p=preparation,d=journeeMarche(),bilan=bilanJournee(),maintenant=new Date().toISOString();
+  if(!archiverJourneeEnCours("marche-jour-suivant")
+    &&!window.confirm("La journée en cours n'a pas pu être archivée sur cet appareil.\nAvez-vous exporté la journée en Excel ?\n\nOK : continuer quand même — Annuler : revenir"))return;
+  d.bilan=bilan;d.fermeeLe=maintenant;
+  viderJournee();fondCaisse=fond;
+  p.journees.push({numero:p.journees.length+1,date:dateLocale(),ouverteLe:maintenant,fond:fond});
+  delete p.continuerLe;
+  sauverPreparation();sauvegarder();
+  window.fermerModalMarche();rafraichirCaisse();
+  showToast("🌅 Jour "+p.journees.length+" commencé : stock restant conservé");
+};
+window.continuerJourneeMarche=function(){
+  if(!marcheOuvert())return;
+  preparation.continuerLe=dateLocale();sauverPreparation();
+  window.fermerModalMarche();majTableauMarche();
+  showToast("Journée du "+jourCourt(journeeMarche().date)+" poursuivie ; SHAYA MANAGER datera les ventes d'aujourd'hui au "+jourCourt(dateLocale()));
+};
+
+// Retour à l'état d'avant l'ouverture, tant qu'aucune vente (ni sortie) n'a été enregistrée.
+window.annulerOuverture=function(){
+  if(!marcheOuvert())return;
+  if(sessionNonVide()||preparation.journees.length>1){showToast("Des ventes ont été enregistrées : l'ouverture ne peut plus être annulée");return;}
+  if(!window.confirm("Annuler l'ouverture de « "+preparation.evenement.nom+" » ?\nLe stock, les produits masqués, le fond et l'objectif d'avant l'ouverture sont rétablis (les corrections faites depuis l'ouverture aussi). La préparation est gardée."))return;
+  var a=preparation.ouverture.avant,maintenant=new Date().toISOString();
+  historiquePreparations.push(Object.assign(copieProfonde(preparation),{motif:"ouverture-annulee",archiveeLe:maintenant}));
+  stockData=copieProfonde(a.stock);disabledProducts=copieProfonde(a.masques);fondCaisse=a.fond||0;objectifCA=a.objectif||0;
+  preparation.statut="preparee";delete preparation.ouverture;delete preparation.journees;delete preparation.continuerLe;
+  sauverPreparation();sauvegarder();rafraichirCaisse();
+  showToast("Ouverture annulée : caisse rétablie, préparation gardée");
+};
+
+// Fin du marché : journée en cours archivée, bilan dans l'historique, stock restant des produits emportés
+// conservé, autres produits rétablis comme avant l'ouverture. La préparation n'est plus active (jamais réactivée).
+window.demanderFinMarche=function(){
+  if(!marcheOuvert())return;
+  var p=preparation,b=bilanJournee(),ca=caEvenement();
+  var h="<div class='modal-reset-icon'>🏁</div><div class='modal-reset-title'>Terminer le marché</div>";
+  h+=ligneMarche("Événement",echapperHtml(p.evenement.nom));
+  h+=ligneMarche("Journées",String(p.journees.length));
+  h+=ligneMarche("CA de l'événement",fmt(ca)+(p.objectif?" · "+pourcent(ca/p.objectif*100)+" de "+fmt(p.objectif):""));
+  h+=ligneMarche("Journée en cours",b.ventes+" vente"+(b.ventes>1?"s":"")+" · "+fmt(b.ca));
+  var mod=p.ouverture.modifies||{stock:{},masques:{}},nbMod=PRODUCTS.filter(function(x){return mod.stock[x.id]||mod.masques[x.id];}).length;
+  h+=ligneMarche("Corrections faites pendant le marché",nbMod?nbMod+" produit"+(nbMod>1?"s":"")+" · conservées":"aucune");
+  h+="<div class='marche-texte'>La journée en cours est archivée sur l'iPad et le bilan du marché rejoint l'historique. Le stock restant des produits emportés est conservé, ainsi que toutes les corrections de stock et d'affichage faites pendant le marché ; les autres produits retrouvent leur stock et leur affichage d'avant l'ouverture. Le fond de caisse revient à 0. Le comptage des espèces et le bilan détaillé viendront avec la clôture (étape 5).</div>";
+  h+="<div class='modal-reset-btns'><button class='cancel' onclick='fermerModalMarche()'>Annuler</button><button class='confirm' onclick='terminerMarche()'>🏁 Terminer</button></div>";
+  ouvrirModalMarche(h);
+};
+window.terminerMarche=function(){
+  if(!marcheOuvert()){window.fermerModalMarche();return;}
+  var p=preparation,d=journeeMarche(),bilan=bilanJournee(),maintenant=new Date().toISOString();
+  if(!archiverJourneeEnCours("fin-marche")
+    &&!window.confirm("La journée en cours n'a pas pu être archivée sur cet appareil.\nAvez-vous exporté la journée en Excel ?\n\nOK : terminer quand même — Annuler : revenir"))return;
+  d.bilan=bilan;d.fermeeLe=maintenant;
+  var ca=arrondi(p.journees.reduce(function(s,j){return s+(j.bilan?j.bilan.ca:0);},0));
+  // Produits emportés : stock restant (ventes et corrections comprises). Produits non emportés : stock d'avant
+  // l'ouverture. Affichage d'avant l'ouverture. Une correction faite pendant le marché (stock ou affichage) est gardée.
+  var a=p.ouverture.avant,mod=p.ouverture.modifies||{stock:{},masques:{}};
+  PRODUCTS.forEach(function(x){
+    if(!(p.quantites[x.id]>0)&&!mod.stock[x.id]&&a.stock[x.id]!==undefined)stockData[x.id]=a.stock[x.id];
+    if(!mod.masques[x.id]){if(a.masques[x.id])disabledProducts[x.id]=true;else delete disabledProducts[x.id];}
+  });
+  viderJournee();fondCaisse=0;objectifCA=a.objectif||0;
+  historiquePreparations.push(Object.assign(copieProfonde(p),{statut:"terminee",motif:"terminee",archiveeLe:maintenant,caEvenement:ca}));
+  preparation=null;
+  sauverPreparation();sauvegarder();
+  window.fermerModalMarche();rafraichirCaisse();
+  showToast("🏁 Marché terminé : bilan gardé dans l'historique");
+};
+
+// Tableau du marché (panneau 🗓️ quand un marché est ouvert).
+function renderMarche(){
+  var el=document.getElementById("marcheTableau");if(!el||!marcheOuvert()||!preparation)return;
+  var p=preparation,e=p.evenement,d=journeeMarche(),b=bilanJournee(),caEv=caEvenement(),solde=arrondi(fondCaisse+b.especes-b.sorties);
+  var kpi=function(l,v,s){return "<div class='marche-kpi'><div class='marche-kpi-lbl'>"+l+"</div><div class='marche-kpi-val'>"+v+"</div>"+(s?"<div class='marche-kpi-sous'>"+s+"</div>":"")+"</div>";};
+  var h="<div class='marche-entete'><strong>"+echapperHtml(e.nom)+"</strong><span>"+libelleJour()+" · "+jourCourt(d.date)+" · ouverte à "+heure(d.ouverteLe)+"</span>";
+  h+="<span>"+(e.fictif?"Marché fictif (démonstration) : ventes sans événement SHAYA MANAGER":"Ventes rattachées à l'événement SHAYA MANAGER")+"</span></div>";
+  if(peutCommencerJour())h+="<div class='marche-alerte'>La journée du "+jourCourt(d.date)+" est toujours ouverte (rien n'a été remis à zéro). Les ventes d'aujourd'hui s'y ajoutent, mais SHAYA MANAGER les compte à leur date réelle (date comptable du "+jourCourt(dateLocale())+"). Touchez « Commencer la journée suivante » quand vous êtes prêt.</div>";
+  h+="<div class='marche-grille'>"+kpi("CA du jour",fmt(b.ca),b.ventes+" vente"+(b.ventes>1?"s":""))+kpi("CA de l'événement",fmt(caEv),p.journees.length+" journée"+(p.journees.length>1?"s":""))
+    +kpi("💵 Espèces (jour)",fmt(b.especes))+kpi("📱 SumUp (jour)",fmt(b.sumup))+"</div>";
+  h+=kpi("Solde théorique des espèces",fmt(solde),"Fond "+fmt(fondCaisse)+" + espèces "+fmt(b.especes)+" − sorties "+fmt(b.sorties));
+  if(p.objectif>0){
+    var pct=caEv/p.objectif*100;
+    h+="<div class='marche-kpi'><div class='marche-kpi-lbl'>Objectif de l'événement</div><div class='objectif-bar-track marche-barre'><div class='objectif-bar-fill"+(pct>=100?" done":pct>=50?" halfway":"")+"' style='width:"+Math.min(pct,100)+"%'></div></div>"
+      +"<div class='marche-kpi-sous'>"+fmt(caEv)+" sur "+fmt(p.objectif)+" · "+pourcent(pct)+"</div></div>";
+  }else h+=kpi("Objectif de l'événement","aucun");
+  h+="<div><div class='cp-section-title'>Journées</div>"+p.journees.map(function(j){
+    return ligneMarche("Jour "+j.numero+" · "+jourCourt(j.date),j.bilan?fmt(j.bilan.ca)+" · "+j.bilan.ventes+" vente"+(j.bilan.ventes>1?"s":""):"en cours");
+  }).join("")+"</div>";
+  el.innerHTML=h;
+}
+function majBoutonsPanneau(){
+  var ouvert=marcheOuvert(),cache=function(id,v){var b=document.getElementById(id);if(b)b.hidden=v;};
+  cache("prepOuvrir",ouvert||!preparation||preparation.statut!=="preparee");
+  cache("prepEnregistrer",ouvert);
+  cache("prepAbandonner",ouvert||!preparation);
+  cache("marcheJourSuivant",!peutCommencerJour());
+  cache("marcheAnnuler",!ouvert||sessionNonVide()||!preparation||preparation.journees.length>1);
+  cache("marcheTerminer",!ouvert);
+}
+function majTableauMarche(){
+  var p=document.getElementById("prepPanel");
+  if(p&&p.classList.contains("open")&&marcheOuvert()){renderMarche();majBoutonsPanneau();}
+  majBoutonPreparation();
+}
+function afficherProvenance(r){
+  var el=document.getElementById("prepProvenance");if(!el)return;
+  var raison={"hors-ligne":"hors ligne","injoignable":"SHAYA MANAGER injoignable","non-connectee":"caisse non connectée à SHAYA MANAGER (bouton 🔄)"}[r.raison]||"hors ligne";
+  el.className="prep-aide prep-provenance"+(r.source==="shaya"?" recue":"");
+  el.textContent=r.source==="shaya"?"✅ Liste reçue de SHAYA MANAGER le "+dateHeure(r.recueLe)
+    :!r.liste.length?"Aucune liste reçue de SHAYA MANAGER ("+raison+")"
+    :"Dernière liste enregistrée — "+raison+(r.recueLe?" (reçue de SHAYA MANAGER le "+dateHeure(r.recueLe)+")":"");
 }
 
 function demarrerSynchro(){
@@ -3362,7 +3717,7 @@ function demarrerSynchro(){
     majIndicateur();renderTickets();
     if(syncConnexion){
       synchroniser().then(chargerCatalogue);
-      if(!evenementDuJour())setTimeout(function(){showToast("🔄 Choisissez l'événement du jour (bouton SHAYA)");},2500);
+      if(!evenementDuJour()&&!marcheOuvert())setTimeout(function(){showToast("🔄 Choisissez l'événement du jour (bouton SHAYA)");},2500);
     }
   }).catch(function(){majIndicateur();});
   window.addEventListener("online",function(){syncProchain=0;syncDelai=0;planifierSynchro(500);setTimeout(chargerCatalogue,1500);});
@@ -3392,6 +3747,7 @@ try{
   }
 }catch(_e){}
 appliquerCatalogue(lireCatalogueLocal());
+chargerPreparation();   // avant restaurer() : un marché ouvert n'est jamais archivé à minuit
 var restored=restaurer();
 if(!journeeDu)journeeDu=aujourdhui();
 afficherModeDemonstration();
@@ -3424,6 +3780,7 @@ function updateSoldeCaisse(){
   updateObjectifBar();
   var sv=document.getElementById("cpSoldeVal");if(sv){sv.textContent=fmt(solde);sv.style.color=solde>=0?"var(--green)":"#e94560";}
   var sd=document.getElementById("cpSoldeDetail");if(sd)sd.textContent="Fond: "+fmt(fondCaisse)+" + Esp: "+fmt(caEsp)+" - Sorties: "+fmt(sorTot);
+  majTableauMarche();
 }
 // ── PANELS TOGGLE ─────────────────────────────────────────────
 window.toggleCaisse=function(){document.getElementById("caissePanel").classList.toggle("open");renderCaisse();};
@@ -3435,6 +3792,7 @@ window.setObjectif=function(){
   var val=parseFloat(raw)||0;
   if(val<=0){showToast("Entrez un objectif valide");return;}
   objectifCA=val;
+  if(marcheOuvert()&&preparation){preparation.objectif=val;sauverPreparation();}   // objectif de l'événement
   document.getElementById("cpObjectif").value=val;
   updateObjectifBar();
   renderCaisse();
@@ -3443,7 +3801,8 @@ window.setObjectif=function(){
 };
 
 function updateObjectifBar(){
-  var ca=totalCA;
+  // Marché ouvert : objectif de l'événement, comparé au chiffre d'affaires de toutes ses journées.
+  var ca=marcheOuvert()&&preparation?caEvenement():totalCA;
   var obj=objectifCA;
   if(obj<=0){
     document.getElementById("objectifBarFill").style.width="0%";
@@ -3451,7 +3810,7 @@ function updateObjectifBar(){
     var box=document.getElementById("objectifBox");if(box)box.style.display="none";
     return;
   }
-  var pct=Math.min(Math.round(ca/obj*100),100);
+  var brut=ca/obj*100,pct=Math.min(brut,100);
   var fill=document.getElementById("objectifBarFill");
   var fill2=document.getElementById("objectifBarFill2");
   var label=document.getElementById("objectifBarLabel");
@@ -3467,14 +3826,14 @@ function updateObjectifBar(){
     fill2.className="objectif-bar-fill"+(pct>=100?" done":pct>=50?" halfway":"");
   }
   if(label)label.textContent=fmt(ca)+" / "+fmt(obj);
-  if(pctEl)pctEl.textContent=pct+"%";
+  if(pctEl)pctEl.textContent=pourcent(brut);
   if(detail)detail.textContent=fmt(ca)+" encaissé sur "+fmt(obj)+" d'objectif";
   if(box)box.style.display=pct>0?"block":"none";
 }
 
 window.setFondCaisse=function(){
   var raw=(document.getElementById("cpFond").value||"").replace(",",".");var val=parseFloat(raw)||0;
-  fondCaisse=val;document.getElementById("cpFond").value=val;updateSoldeCaisse();renderCaisse();sauvegarder();showToast("Fond: "+fmt(val));
+  fondCaisse=val;if(marcheOuvert()&&journeeMarche()){journeeMarche().fond=val;sauverPreparation();}document.getElementById("cpFond").value=val;updateSoldeCaisse();renderCaisse();sauvegarder();showToast("Fond: "+fmt(val));
 };
 window.addSortie=function(){
   var label=document.getElementById("cpSortieLabel").value.trim();
@@ -3611,7 +3970,8 @@ renderDons();
 renderCart();
 updateTotals();
 attachBilletEvents();
-chargerPreparation();
+// Marché ouvert sur plusieurs jours, nouvelle date : journée suivante proposée (jamais commencée d'elle-même).
+setTimeout(proposerJourSuivant,800);
 </script>
 </body>
 </html>

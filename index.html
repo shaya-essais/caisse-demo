@@ -50,7 +50,7 @@
 .bandeau-demo .btn-sm{margin-left:10px;background:#1a1a1a;color:#fff;border-color:#1a1a1a}
 /* Démonstration : les panneaux latéraux commencent sous le bandeau (une ou deux lignes selon la largeur), sinon
    il cache leur bouton de fermeture. Hauteur mesurée par le script qui affiche le bandeau. */
-body.mode-demo :is(.stock-panel,.promo-panel,.flash-panel,.caisse-panel,.autres-panel,.dons-panel,.ticket-list,.excel-panel){top:var(--hauteur-bandeau,0px)}
+body.mode-demo :is(.stock-panel,.promo-panel,.flash-panel,.caisse-panel,.autres-panel,.dons-panel,.ticket-list,.excel-panel,.prep-panel){top:var(--hauteur-bandeau,0px)}
 body.mode-demo .topbar{box-shadow:inset 0 -4px 0 #f5a623}
 :root{
   --bg:#0d0d0f;--surface:#18181c;--surface2:#222228;--surface3:#2c2c35;
@@ -432,6 +432,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .modal-stock .modal-reset-sub{width:100%;text-align:left}
 .controle-stock-ligne{padding:5px 0;border-top:1px solid var(--border)}
 .modal-stock-corriger{width:100%;padding:10px;border:1px solid var(--border2);border-radius:var(--r-sm);background:none;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+/* Préparer un marché : panneau à gauche, au-dessus des autres panneaux. */
+.prep-panel{position:absolute;top:0;left:0;bottom:0;width:420px;max-width:100%;background:var(--surface);border-right:1px solid var(--border2);display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s ease;z-index:160}
+.prep-panel.open{transform:translateX(0)}
+.prep-etat{border-radius:var(--r-sm);padding:10px 12px;font-size:12px;line-height:1.5;background:var(--surface2);border:1px solid var(--border2);color:var(--text2)}
+.prep-etat strong{color:var(--text)}
+.prep-etat.preparee{background:rgba(46,204,143,.08);border-color:rgba(46,204,143,.3)}
+.prep-select{width:100%;text-align:left;font-family:'DM Sans',sans-serif}
+.prep-aide{font-size:11px;color:var(--text3);margin-top:4px;line-height:1.4}
+.prep-deux{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.prep-deux .cp-input{min-width:0}
+.prep-unite{color:var(--text3);font-size:13px;flex-shrink:0}
+.prep-outils{display:flex;gap:6px;margin:8px 0 6px}
+.prep-total{font-size:11px;color:var(--text2);margin-bottom:6px}
+.prep-liste{display:flex;flex-direction:column;gap:6px}
+.prep-cat{font-size:11px;font-weight:600;color:var(--text2);margin-top:6px}
+.prep-historique{font-size:12px;color:var(--text2)}
+.prep-historique summary{cursor:pointer;padding:6px 0}
+.prep-historique ul{margin:0;padding-left:18px}
+.prep-historique li{margin:4px 0}
+.prep-footer{flex-shrink:0;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-top:1px solid var(--border)}
+.prep-enregistrer{width:100%;padding:11px}
+.btn-prep{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-prep.preparee{border-color:rgba(46,204,143,.5);color:var(--green)}
 /* Caisse ouverte depuis l'écran d'accueil de l'iPad (« black-translucent ») : la page passe sous l'heure et la
    batterie. Bordures couleur du fond plutôt que marges, pour que les panneaux latéraux commencent eux aussi
    sous la barre d'état. Valeurs nulles dans Safari et sur PC. */
@@ -499,6 +522,9 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
   .epuises-btn{min-height:40px;padding:8px 14px;font-size:13px}
   .cart-ajuster{min-height:30px;padding:4px 12px;font-size:12px}
   .modal-reset-btns button,.modal-stock-corriger{min-height:44px}
+  /* Préparer un marché */
+  .prep-panel{width:min(460px,100%)}
+  .prep-select{min-height:44px;font-size:16px}
 }
 /* Paysage (iPad, hauteur suffisante) : le panier prend toute la hauteur à droite, la barre du haut ne couvre
    que le catalogue. Remise et code promo côte à côte. Les téléphones à l'horizontale gardent la disposition
@@ -557,6 +583,7 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
     <button class="btn-sm" id="btnSync" onclick="toggleSync()" title="Synchronisation avec SHAYA MANAGER" aria-label="Synchronisation avec SHAYA MANAGER" style="padding:6px 8px"><span class="sync-dot" id="syncDot"></span>🔄<span id="syncCompte"></span></button>
     <button class="btn-sm" onclick="toggleTickets()">Tickets</button>
     <button class="btn-sm" onclick="toggleStock()">📦 Stock</button>
+    <button class="btn-sm btn-prep" id="btnPreparation" onclick="togglePreparation()">🗓️ Préparer un marché</button>
     <button class="btn-sm" onclick="toggleCaisse()">💰 Caisse</button>
     <button class="btn-sm" onclick="toggleAutres()">📦 Autres</button>
     <button class="btn-sm" onclick="toggleDons()">🎁 Dons</button>
@@ -660,6 +687,36 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
     </div>
     <button class="sp-reset-btn" onclick="resetAllStock()">↺ Remettre tous les stocks à zéro</button>
     <button class="sp-reset-btn" style="color:#7C3F9E;border-color:rgba(124,63,158,.4);font-weight:600" onclick="downloadReapPDF()">🖨️ PDF Réapprovisionnement</button>
+  </div>
+</div>
+
+<!-- Préparer un marché : faite la veille, gardée sur l'appareil, appliquée seulement à l'ouverture du marché -->
+<div class="prep-panel" id="prepPanel">
+  <div class="cp-header"><h3>🗓️ Préparer un marché</h3><button class="btn-sm" onclick="togglePreparation()">✕</button></div>
+  <div class="cp-body">
+    <div class="prep-etat" id="prepEtat"></div>
+    <div><div class="cp-section-title">1. Événement (SHAYA MANAGER)</div>
+      <select class="cp-input prep-select" id="prepEvenement" onchange="prepEvenementChoisi()"></select>
+      <div class="prep-aide" id="prepEvenementInfo"></div>
+    </div>
+    <div class="prep-deux">
+      <div><div class="cp-section-title">2. Fond de caisse</div>
+        <div class="cp-input-row"><input class="cp-input" id="prepFond" type="text" inputmode="decimal" placeholder="Ex : 150" autocomplete="off" oninput="prepModifiee()"><span class="prep-unite">€</span></div></div>
+      <div><div class="cp-section-title">3. Objectif de CA</div>
+        <div class="cp-input-row"><input class="cp-input" id="prepObjectif" type="text" inputmode="decimal" placeholder="Ex : 800" autocomplete="off" oninput="prepModifiee()"><span class="prep-unite">€</span></div></div>
+    </div>
+    <div class="prep-aide">Fond de caisse : espèces de départ, jamais comptées dans le chiffre d'affaires. Objectif : pour tout l'événement.</div>
+    <div><div class="cp-section-title">4. Produits et quantités emportés</div>
+      <div class="prep-aide">0 = produit non emporté ; ∞ = quantité illimitée.</div>
+      <div class="prep-outils"><button class="sp-reset-btn" onclick="prepReprendreStock()">↺ Reprendre le stock actuel</button><button class="sp-reset-btn" onclick="prepToutAZero()">Tout à 0</button></div>
+      <div class="prep-total" id="prepTotal"></div>
+      <div class="prep-liste" id="prepListe"></div>
+    </div>
+    <details class="prep-historique" id="prepHistorique" hidden></details>
+  </div>
+  <div class="prep-footer">
+    <button class="cp-btn prep-enregistrer" onclick="enregistrerPreparation()">Enregistrer la préparation</button>
+    <button class="sp-reset-btn" id="prepAbandonner" onclick="abandonnerPreparation()" hidden>Abandonner la préparation</button>
   </div>
 </div>
 
@@ -2921,7 +2978,7 @@ window.quitterDemonstration=function(){
 };
 window.effacerDonneesDemonstration=function(){
   if(!DEMO)return;
-  if(!window.confirm("Effacer toutes les données de démonstration de cet appareil (ventes, stock, file d'envoi, réglages, archives) ?\n\nLes données réelles ne sont pas touchées."))return;
+  if(!window.confirm("Effacer toutes les données de démonstration de cet appareil (ventes, stock, préparation de marché, file d'envoi, réglages, archives) ?\n\nLes données réelles ne sont pas touchées."))return;
   var cles=[];
   for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(ESPACE_DEMO)===0)cles.push(k);}
   cles.forEach(function(k){localStorage.removeItem(k);});
@@ -3025,11 +3082,15 @@ function chargerEvenements(){
     sel.innerHTML=h;sel.value=courant?courant.id:"";
     if(info)info.textContent=courant?"Les prochaines ventes sont rattachées à cet événement. Une vente déjà encaissée garde le sien (correction dans SHAYA MANAGER).":"Aucun événement choisi : les prochaines ventes sont des ventes hors événement (POS).";
   };
-  if(!syncConnexion||navigator.onLine===false){remplir(evenementsLocaux());return;}
-  appelApi("GET","/evenements").then(function(rep){
-    if(rep.statut===200){var l=rep.corps.evenements||[];try{localStorage.setItem(EVENEMENTS_CLE,JSON.stringify(l));}catch(e){}remplir(l);}
-    else remplir(evenementsLocaux());
-  },function(){remplir(evenementsLocaux());});
+  obtenirEvenements().then(remplir);
+}
+// Événements de SHAYA MANAGER : liste reçue (gardée pour un choix hors ligne), sinon dernière liste gardée.
+function obtenirEvenements(){
+  if(!syncConnexion||navigator.onLine===false)return Promise.resolve(evenementsLocaux());
+  return appelApi("GET","/evenements").then(function(rep){
+    if(rep.statut===200){var l=rep.corps.evenements||[];try{localStorage.setItem(EVENEMENTS_CLE,JSON.stringify(l));}catch(e){}return l;}
+    return evenementsLocaux();
+  },function(){return evenementsLocaux();});
 }
 // Jamais rétroactif : l'événement choisi vaut pour les ventes suivantes. Les ventes du jour encaissées
 // sans événement peuvent y être rattachées, sur confirmation ; une vente déjà rattachée à un
@@ -3050,6 +3111,238 @@ window.choisirEvenement=function(id){
   chargerEvenements();
   showToast(id?"Événement des prochaines ventes : "+nom:"Prochaines ventes sans événement (caisse hors événement)");
 };
+
+// ── PRÉPARER UN MARCHÉ (SHAYA) ─────────────────────────────────────────────────────────────────
+// Faite la veille : événement de SHAYA MANAGER (son identifiant), fond de caisse, objectif de l'événement,
+// quantités emportées. Gardée sur l'appareil (copie immédiate dans localStorage, copie dans IndexedDB),
+// à part pour la démonstration ; « Nouveau jour » et le changement de date n'y touchent pas. Elle ne change
+// rien à la caisse (stock, fond, objectif, ventes) tant que le marché n'est pas ouvert. Une préparation
+// remplacée ou abandonnée est gardée dans l'historique, jamais effacée.
+var PREPARATION_CLE=DEMO?ESPACE_DEMO+"preparation":"shaya_caisse_preparation";
+var PREPARATIONS_HISTO_CLE=DEMO?ESPACE_DEMO+"preparations_historique":"shaya_caisse_preparations_historique";
+var EVENEMENT_FICTIF_DEMO={id:null,nom:"Marché de démonstration (fictif)",type:"MARKET",lieu:null,debut:null,fin:null,fictif:true};
+var TYPES_EVENEMENT={CONVENTION:"Convention",MARKET:"Marché",FAIR:"Salon",OTHER:"Autre"};
+var preparation=null,historiquePreparations=[],prepForm=null;
+
+function ecrireLocal(cle,valeur){try{localStorage.setItem(cle,JSON.stringify(valeur));return true;}catch(e){return false;}}
+function chargerPreparation(){
+  var brut=null;
+  try{brut=localStorage.getItem(PREPARATION_CLE);preparation=brut?JSON.parse(brut):null;}
+  catch(e){try{localStorage.setItem(PREPARATION_CLE+"_illisible_"+Date.now(),brut);}catch(e2){}preparation=null;brut=null;}
+  try{var h=JSON.parse(localStorage.getItem(PREPARATIONS_HISTO_CLE)||"[]");historiquePreparations=Array.isArray(h)?h:[];}catch(e){historiquePreparations=[];}
+  majBoutonPreparation();
+  // Copie locale absente (stockage partiellement effacé) : reprise depuis la copie IndexedDB. Une préparation
+  // abandonnée laisse « null » dans la copie locale, elle ne revient donc jamais d'elle-même.
+  lireReglage("preparation").then(function(p){
+    if(p&&brut===null&&!preparation){preparation=p;ecrireLocal(PREPARATION_CLE,p);majBoutonPreparation();}
+  },function(){});
+  lireReglage("preparations_historique").then(function(h){
+    if(Array.isArray(h)&&h.length>historiquePreparations.length){historiquePreparations=h;ecrireLocal(PREPARATIONS_HISTO_CLE,h);}
+  },function(){});
+}
+function sauverPreparation(){
+  var ok=ecrireLocal(PREPARATION_CLE,preparation)&&ecrireLocal(PREPARATIONS_HISTO_CLE,historiquePreparations);
+  ecrireReglage("preparation",preparation).catch(function(){});
+  ecrireReglage("preparations_historique",historiquePreparations).catch(function(){});
+  return ok;
+}
+function archiverPreparation(motif,le){historiquePreparations.push(Object.assign({},preparation,{motif:motif,archiveeLe:le}));}
+function majBoutonPreparation(){
+  var b=document.getElementById("btnPreparation");if(!b)return;
+  b.textContent=preparation?"🗓️ Préparé : "+preparation.evenement.nom:"🗓️ Préparer un marché";
+  b.classList.toggle("preparee",!!preparation);
+}
+function dateCourte(iso){
+  if(!iso)return "";var p=iso.split("-");
+  return new Date(+p[0],p[1]-1,+p[2]).toLocaleDateString("fr-FR",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"});
+}
+function texteMontant(n){return n?(Number.isInteger(n)?String(n):n.toFixed(2)).replace(".",","):"";}
+// Montant saisi : vide = 0 ; nombre positif, 2 décimales au plus ; null si invalide.
+function lireMontant(id){
+  var brut=String(document.getElementById(id).value||"").trim().replace(/\s/g,"").replace(",",".");
+  if(!brut)return 0;
+  if(!/^\d{1,6}(\.\d{1,2})?$/.test(brut))return null;
+  return Number(brut);
+}
+
+window.togglePreparation=function(){
+  var p=document.getElementById("prepPanel");
+  if(p.classList.contains("open")){
+    if(prepForm&&prepForm.modifie&&!window.confirm("Fermer sans enregistrer les modifications de la préparation ?"))return;
+    p.classList.remove("open");prepForm=null;return;
+  }
+  ouvrirFormulairePreparation();p.classList.add("open");
+};
+window.prepModifiee=function(){if(prepForm)prepForm.modifie=true;};
+function ouvrirFormulairePreparation(){
+  var base=preparation;
+  prepForm={quantites:{},evenements:[],modifie:false};
+  PRODUCTS.forEach(function(p){
+    var q=base&&base.quantites&&base.quantites[p.id]!==undefined?base.quantites[p.id]:stockDe(p.id);
+    prepForm.quantites[p.id]=q;
+  });
+  document.getElementById("prepFond").value=base?texteMontant(base.fondCaisse):"";
+  document.getElementById("prepObjectif").value=base?texteMontant(base.objectif):"";
+  renderEtatPreparation();renderListePreparation();renderHistoriquePreparations();
+  remplirEvenementsPreparation(base?base.evenement:null);
+}
+function remplirEvenementsPreparation(choisi){
+  var sel=document.getElementById("prepEvenement");
+  sel.innerHTML="<option value=''>Chargement…</option>";
+  obtenirEvenements().then(function(liste){
+    if(!prepForm)return;
+    var aujourdHui=dateLocale();
+    // Événements en cours ou à venir : un événement terminé ne se prépare plus.
+    var utiles=liste.filter(function(e){return e&&e.id&&e.nom&&(e.fin||e.debut)>=aujourdHui;});
+    if(choisi&&!choisi.fictif&&!utiles.some(function(e){return e.id===choisi.id;}))utiles.push(choisi);
+    prepForm.evenements=utiles;
+    var h="<option value=''>— Choisissez l'événement —</option>";
+    utiles.forEach(function(e){h+="<option value='"+echapperHtml(e.id)+"'>"+echapperHtml(e.nom)+(e.debut?" ("+dateCourte(e.debut)+")":"")+"</option>";});
+    if(DEMO)h+="<option value='fictif'>"+EVENEMENT_FICTIF_DEMO.nom+"</option>";
+    sel.innerHTML=h;
+    sel.value=choisi?(choisi.fictif?"fictif":choisi.id):"";
+    majInfoEvenementPreparation();
+  });
+}
+function evenementChoisi(){
+  var v=document.getElementById("prepEvenement").value;
+  if(v==="fictif"&&DEMO)return EVENEMENT_FICTIF_DEMO;
+  return prepForm&&prepForm.evenements.find(function(e){return e.id===v;})||null;
+}
+window.prepEvenementChoisi=function(){window.prepModifiee();majInfoEvenementPreparation();};
+function majInfoEvenementPreparation(){
+  var el=document.getElementById("prepEvenementInfo");if(!el||!prepForm)return;
+  var e=evenementChoisi();
+  if(e&&e.fictif){el.textContent="Événement fictif, pour la démonstration : les ventes n'y seront rattachées dans aucun événement de SHAYA MANAGER.";return;}
+  if(e){
+    var jours=e.fin?Math.round((new Date(e.fin)-new Date(e.debut))/86400000)+1:1;
+    el.textContent=[TYPES_EVENEMENT[e.type]||null,e.lieu||null,e.fin&&e.fin!==e.debut?"du "+dateCourte(e.debut)+" au "+dateCourte(e.fin)+" ("+jours+" jours)":dateCourte(e.debut)].filter(Boolean).join(" · ");
+    return;
+  }
+  el.textContent=prepForm.evenements.length?"Choisissez l'événement enregistré dans SHAYA MANAGER."
+    :"Aucun événement à venir reçu de SHAYA MANAGER. Avec le réseau, connectez la caisse (bouton 🔄) pour charger la liste."+(DEMO?" En démonstration, vous pouvez choisir l'événement fictif.":"");
+}
+
+// Quantités emportées : modifiées dans le formulaire seulement, enregistrées avec la préparation.
+function lignePreparation(p){
+  var q=prepForm.quantites[p.id],illimite=stockIllimite(q),actuel=stockDe(p.id);
+  var h="<div class='sp-item' data-prep-id='"+p.id+"'"+(q>0?"":" style='opacity:.6'")+"><div style='font-size:16px'>"+p.emoji+"</div>";
+  h+="<div class='sp-item-info'><div class='sp-item-name'>"+echapperHtml(p.label)+"</div><div class='sp-item-cat'>En caisse : "+(stockIllimite(actuel)?"∞":actuel);
+  if(!illimite)h+="<button class='sp-illimite' onclick='prepIllimite("+p.id+")' title='Quantité illimitée'>∞</button>";
+  h+="</div></div><div class='sp-qty-ctrl'>";
+  h+="<button class='sp-qty-btn' onclick='prepChanger("+p.id+",-1)'"+(illimite||q<=0?" disabled":"")+">−</button>";
+  h+="<input class='sp-qty-input "+(illimite?"illimite":q<=0?"out":"ok")+"' type='text' inputmode='numeric' pattern='[0-9]*' autocomplete='off' value='"+(illimite?"∞":q)+"'"
+    +" aria-label='Quantité emportée : "+echapperHtml(p.label)+"' onfocus='this.select()' onkeydown='if(event.key==\"Enter\")this.blur()' onchange='prepSaisir("+p.id+",this)'>";
+  h+="<button class='sp-qty-btn' onclick='prepChanger("+p.id+",1)'"+(illimite||q>=STOCK_MAX?" disabled":"")+">+</button>";
+  return h+"</div></div>";
+}
+function renderListePreparation(){
+  var el=document.getElementById("prepListe");if(!el||!prepForm)return;
+  var h="",cat=null;
+  PRODUCTS.forEach(function(p){
+    if(p.cat!==cat){cat=p.cat;h+="<div class='prep-cat'>"+echapperHtml(cat)+"</div>";}
+    h+=lignePreparation(p);
+  });
+  el.innerHTML=h;majTotalPreparation();
+}
+// Une seule ligne redessinée : le champ que l'on vient de toucher ailleurs garde le clavier.
+function majLignePreparation(id){
+  var p=PRODUCTS.find(function(x){return x.id===id;}),ligne=document.querySelector("#prepListe [data-prep-id='"+id+"']");
+  if(p&&ligne)ligne.outerHTML=lignePreparation(p);
+  majTotalPreparation();
+}
+function majTotalPreparation(){
+  var emportes=0,articles=0,illimites=0;
+  PRODUCTS.forEach(function(p){var q=prepForm.quantites[p.id];if(q>0){emportes++;if(stockIllimite(q))illimites++;else articles+=q;}});
+  document.getElementById("prepTotal").textContent=emportes+" produit"+(emportes>1?"s":"")+" emporté"+(emportes>1?"s":"")+" sur "+PRODUCTS.length
+    +" · "+articles+" article"+(articles>1?"s":"")+(illimites?" + "+illimites+" en quantité illimitée":"");
+}
+window.prepSaisir=function(id,champ){
+  if(!prepForm)return;
+  var q=prepForm.quantites[id],affiche=stockIllimite(q)?"∞":String(q);
+  var brut=String(champ.value||"").trim();
+  if(brut===affiche)return;
+  if(brut==="")brut="0";
+  if(brut==="∞"){prepForm.quantites[id]=STOCK_ILLIMITE;}
+  else if(/^[0-9]{1,4}$/.test(brut)&&Number(brut)<=STOCK_MAX){prepForm.quantites[id]=Number(brut);}
+  else{champ.value=affiche;showToast("Quantité invalide : nombre entier de 0 à "+STOCK_MAX);return;}
+  prepForm.modifie=true;majLignePreparation(id);
+};
+window.prepChanger=function(id,delta){
+  if(!prepForm)return;var q=prepForm.quantites[id];
+  if(stockIllimite(q))return;
+  prepForm.quantites[id]=Math.min(STOCK_MAX,Math.max(0,q+delta));
+  prepForm.modifie=true;majLignePreparation(id);
+};
+window.prepIllimite=function(id){if(!prepForm)return;prepForm.quantites[id]=STOCK_ILLIMITE;prepForm.modifie=true;majLignePreparation(id);};
+window.prepReprendreStock=function(){
+  if(!prepForm||!window.confirm("Remplacer toutes les quantités du formulaire par le stock actuel de la caisse ?"))return;
+  PRODUCTS.forEach(function(p){prepForm.quantites[p.id]=stockDe(p.id);});
+  prepForm.modifie=true;renderListePreparation();
+};
+window.prepToutAZero=function(){
+  if(!prepForm||!window.confirm("Mettre toutes les quantités du formulaire à 0 ?\nVous saisirez ensuite seulement les produits emportés."))return;
+  PRODUCTS.forEach(function(p){prepForm.quantites[p.id]=0;});
+  prepForm.modifie=true;renderListePreparation();
+};
+
+window.enregistrerPreparation=function(){
+  if(!prepForm)return;
+  var ev=evenementChoisi();
+  if(!ev){showToast("Choisissez d'abord l'événement");return;}
+  var fond=lireMontant("prepFond"),objectif=lireMontant("prepObjectif");
+  if(fond===null){showToast("Fond de caisse invalide (exemple : 150 ou 150,50)");return;}
+  if(objectif===null){showToast("Objectif invalide (exemple : 800)");return;}
+  var emportes=PRODUCTS.filter(function(p){return prepForm.quantites[p.id]>0;}).length;
+  if(!emportes&&!window.confirm("Aucun produit emporté (toutes les quantités sont à 0).\nEnregistrer quand même ?"))return;
+  var maintenant=new Date().toISOString();
+  var meme=!!preparation&&((preparation.evenement.fictif&&ev.fictif)||(!!ev.id&&preparation.evenement.id===ev.id));
+  if(preparation&&!meme){
+    if(!window.confirm("Remplacer la préparation de « "+preparation.evenement.nom+" » par celle de « "+ev.nom+" » ?\nL'ancienne préparation est gardée dans l'historique."))return;
+    archiverPreparation("remplacee",maintenant);
+  }
+  var quantites={};PRODUCTS.forEach(function(p){quantites[p.id]=prepForm.quantites[p.id];});
+  preparation={version:1,id:meme?preparation.id:nouvelIdentifiant(),statut:"preparee",
+    evenement:{id:ev.id||null,nom:ev.nom,type:ev.type||null,lieu:ev.lieu||null,debut:ev.debut||null,fin:ev.fin||null,fictif:!!ev.fictif},
+    fondCaisse:fond,objectif:objectif,quantites:quantites,
+    prepareeLe:meme?preparation.prepareeLe:maintenant,modifieeLe:meme?maintenant:null,demonstration:DEMO};
+  var ok=sauverPreparation();
+  prepForm.modifie=false;
+  majBoutonPreparation();renderEtatPreparation();renderHistoriquePreparations();
+  showToast(ok?"✅ Préparation enregistrée : "+ev.nom:"⚠️ Copie locale impossible : préparation gardée seulement dans le stockage de l'appareil");
+};
+window.abandonnerPreparation=function(){
+  if(!preparation){showToast("Aucune préparation enregistrée");return;}
+  if(!window.confirm("Abandonner la préparation de « "+preparation.evenement.nom+" » ?\nElle est gardée dans l'historique ; la caisse n'est pas modifiée."))return;
+  archiverPreparation("abandonnee",new Date().toISOString());
+  preparation=null;sauverPreparation();
+  majBoutonPreparation();ouvrirFormulairePreparation();
+  showToast("Préparation abandonnée, gardée dans l'historique");
+};
+function renderEtatPreparation(){
+  var el=document.getElementById("prepEtat"),ab=document.getElementById("prepAbandonner");if(!el)return;
+  if(ab)ab.hidden=!preparation;
+  if(!preparation){
+    el.className="prep-etat";
+    el.textContent="Aucune préparation enregistrée. Choisissez l'événement, puis indiquez le fond de caisse, l'objectif et les quantités emportées.";
+    return;
+  }
+  el.className="prep-etat preparee";
+  el.innerHTML="<strong>Préparé : "+echapperHtml(preparation.evenement.nom)+"</strong><br>Préparation du "+dateHeure(preparation.prepareeLe)
+    +(preparation.modifieeLe?", modifiée le "+dateHeure(preparation.modifieeLe):"")
+    +"<br>Fond de caisse "+fmt(preparation.fondCaisse)+" · objectif "+(preparation.objectif?fmt(preparation.objectif):"aucun")
+    +"<br>Elle sera appliquée à l'ouverture du marché (prochaine étape). D'ici là, rien ne change dans la caisse.";
+}
+function renderHistoriquePreparations(){
+  var el=document.getElementById("prepHistorique");if(!el)return;
+  el.hidden=!historiquePreparations.length;
+  if(!historiquePreparations.length)return;
+  var h="<summary>Historique : "+historiquePreparations.length+" préparation"+(historiquePreparations.length>1?"s":"")+" gardée"+(historiquePreparations.length>1?"s":"")+"</summary><ul>";
+  historiquePreparations.slice().reverse().forEach(function(p){
+    h+="<li>"+echapperHtml(p.evenement.nom)+" — "+(p.motif==="remplacee"?"remplacée":"abandonnée")+" le "+dateHeure(p.archiveeLe)+" (fond "+fmt(p.fondCaisse)+", objectif "+(p.objectif?fmt(p.objectif):"aucun")+")</li>";
+  });
+  el.innerHTML=h+"</ul>";
+}
 
 function demarrerSynchro(){
   // Stockage durable demandé ; IndexedDB vérifié (indisponible en navigation privée sur certains navigateurs).
@@ -3318,6 +3611,7 @@ renderDons();
 renderCart();
 updateTotals();
 attachBilletEvents();
+chargerPreparation();
 </script>
 </body>
 </html>

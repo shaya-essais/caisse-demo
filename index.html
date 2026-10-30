@@ -480,6 +480,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .marche-champ{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text2);margin-top:4px}
 .marche-case{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text);line-height:1.4}
 .marche-case input{margin-top:2px;width:18px;height:18px;flex-shrink:0}
+/* Clôture de la journée et bilan de l'événement */
+.modal-marche.modal-large{width:min(760px,calc(100% - 32px));max-height:calc(100% - 48px);overflow-y:auto}
+.cloture-ecart{font-family:'DM Mono',monospace;font-size:17px;font-weight:700;text-align:right}
+.cloture-ecart.juste{color:var(--green)}.cloture-ecart.excedent{color:var(--amber)}.cloture-ecart.manque{color:#e94560}
+.cloture-note{width:100%;text-align:left;font-family:'DM Sans',sans-serif;font-weight:400}
+.bilan-tableau-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:var(--r-sm)}
+.bilan-tableau{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+.bilan-tableau th,.bilan-tableau td{padding:6px 8px;border-top:1px solid var(--border);text-align:right;color:var(--text)}
+.bilan-tableau thead th{border-top:none;color:var(--text2);font-size:11px;font-weight:600;background:var(--surface2)}
+.bilan-tableau th:first-child,.bilan-tableau td:first-child{text-align:left}
+.bilan-tableau .cloture-ecart{font-size:12px}
+.marche-grille.trois{grid-template-columns:repeat(3,1fr)}
+.btn-bilan{margin-left:6px;padding:2px 10px;border:1px solid var(--border2);border-radius:99px;background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
 /* Caisse ouverte depuis l'écran d'accueil de l'iPad (« black-translucent ») : la page passe sous l'heure et la
    batterie. Bordures couleur du fond plutôt que marges, pour que les panneaux latéraux commencent eux aussi
    sous la barre d'état. Valeurs nulles dans Safari et sur PC. */
@@ -552,6 +565,8 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
   .prep-select{min-height:44px;font-size:16px}
   .marche-kpi-val{font-size:19px}
   .modal-marche .cp-input{min-height:44px}
+  .btn-bilan{min-height:30px;padding:4px 12px;font-size:12px}
+  .marche-grille.trois{grid-template-columns:repeat(2,1fr)}
 }
 /* Paysage (iPad, hauteur suffisante) : le panier prend toute la hauteur à droite, la barre du haut ne couvre
    que le catalogue. Remise et code promo côte à côte. Les téléphones à l'horizontale gardent la disposition
@@ -749,7 +764,10 @@ body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(s
     <button class="cp-btn prep-ouvrir" id="prepOuvrir" onclick="demanderOuverture()" hidden>▶ Ouvrir le marché</button>
     <button class="cp-btn prep-enregistrer" id="prepEnregistrer" onclick="enregistrerPreparation()">Enregistrer la préparation</button>
     <button class="sp-reset-btn" id="prepAbandonner" onclick="abandonnerPreparation()" hidden>Abandonner la préparation</button>
+    <button class="cp-btn prep-ouvrir" id="marcheCloturer" onclick="ouvrirClotureJour()" hidden>🧾 Clôturer la journée</button>
     <button class="cp-btn prep-ouvrir" id="marcheJourSuivant" onclick="ouvrirModalJourSuivant()" hidden>🌅 Commencer la journée suivante</button>
+    <button class="sp-reset-btn" id="marcheRouvrir" onclick="rouvrirJournee()" hidden>↩ Rouvrir la journée</button>
+    <button class="sp-reset-btn" id="marcheBilan" onclick="voirBilanMarche()" hidden>📊 Bilan de l'événement</button>
     <button class="sp-reset-btn" id="marcheAnnuler" onclick="annulerOuverture()" hidden>Annuler l'ouverture</button>
     <button class="sp-reset-btn" id="marcheTerminer" onclick="demanderFinMarche()" hidden>🏁 Terminer le marché</button>
   </div>
@@ -1508,7 +1526,7 @@ function aujourdhui(){return new Date().toLocaleDateString("fr-FR");}
 // Avant toute remise à zéro (« Nouveau jour » ou changement de date), la journée est archivée sur
 // l'appareil (IndexedDB « shaya-caisse »), sans les coordonnées des gagnants : rien n'est perdu.
 var ARCHIVE_PREFIXE=DEMO?ESPACE_DEMO+"journee_":"shaya_caisse_journee_";   // copie immédiate, transférée ensuite dans IndexedDB
-var ARCHIVES_JOURS=120;                         // durée de conservation des journées archivées
+// Journées archivées : conservées sans limite de durée, jamais supprimées automatiquement.
 function nouvelIdentifiant(){
   if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();
   var b=new Uint8Array(16);crypto.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
@@ -1599,16 +1617,8 @@ function migrerArchivesEnAttente(){
         // Copie locale retirée seulement une fois l'archive écrite dans IndexedDB.
         ecrireArchive(db,j).then(function(){localStorage.removeItem(k);ok();},function(){ok();});
       });
-    })).then(function(){return purgerArchives(db);});
+    }));
   }).catch(function(){});
-}
-function purgerArchives(db){
-  var limite=Date.now()-ARCHIVES_JOURS*86400000;
-  return new Promise(function(ok){
-    var tx=db.transaction("journees","readwrite");var st=tx.objectStore("journees");
-    st.openCursor().onsuccess=function(e){var c=e.target.result;if(!c)return;if(Date.parse(c.value.archiveeLe)<limite)c.delete();c.continue();};
-    tx.oncomplete=ok;tx.onerror=ok;
-  });
 }
 function listerArchives(){
   return ouvrirBaseCaisse().then(function(db){return new Promise(function(ok){
@@ -1924,6 +1934,7 @@ window.confirmerPaiement=function(){
   verifierChangementDeJour();
   // Marché sur plusieurs jours : nouvelle date, journée suivante commencée ou journée poursuivie sur décision.
   if(jourAOuvrir()){window.ouvrirModalJourSuivant();return;}
+  if(bloqueSiCloturee())return;
   // Quantités vérifiées avant chaque encaissement : rien n'est encaissé au-delà du stock (SHAYA).
   var horsStock=lignesHorsStock();
   if(horsStock.length){ouvrirControleStock(horsStock);return;}
@@ -2243,6 +2254,7 @@ function renderTickets(){
 // Annulation traçable (SHAYA) : le ticket reste dans l'historique avec la date, l'heure et le motif ;
 // il n'est plus compté. Le stock des articles du catalogue est rétabli. Aucune renumérotation.
 window.annulerTicket=function(uid){
+  if(bloqueSiCloturee())return;
   var t=tickets.find(function(x){return x.uid===uid;});
   if(!t){showToast("Ticket introuvable");return;}
   if(t.statut==="annule"){showToast("Vente déjà annulée");return;}
@@ -3228,7 +3240,7 @@ function archiverPreparation(motif,le){historiquePreparations.push(Object.assign
 function majBoutonPreparation(){
   var b=document.getElementById("btnPreparation");if(!b)return;
   var ouvert=marcheOuvert()&&!!preparation;
-  b.textContent=ouvert?"🟢 "+preparation.evenement.nom+" · "+libelleJour(true):preparation?"🗓️ Préparé : "+preparation.evenement.nom:"🗓️ Préparer un marché";
+  b.textContent=ouvert?"🟢 "+preparation.evenement.nom+" · "+libelleJour(true)+(journeeCloturee()?" · clôturée":""):preparation?"🗓️ Préparé : "+preparation.evenement.nom:"🗓️ Préparer un marché";
   b.classList.toggle("preparee",!!preparation&&!ouvert);
   b.classList.toggle("ouvert",ouvert);
 }
@@ -3427,11 +3439,13 @@ function renderHistoriquePreparations(){
   el.hidden=!historiquePreparations.length;
   if(!historiquePreparations.length)return;
   var h="<summary>Historique : "+historiquePreparations.length+" préparation"+(historiquePreparations.length>1?"s":"")+" gardée"+(historiquePreparations.length>1?"s":"")+"</summary><ul>";
-  historiquePreparations.slice().reverse().forEach(function(p){
+  historiquePreparations.slice().reverse().forEach(function(p,k){
+    var indice=historiquePreparations.length-1-k;
     var motif={remplacee:"préparation remplacée",abandonnee:"préparation abandonnée","ouverture-annulee":"ouverture annulée",terminee:"marché terminé"}[p.motif]||p.motif;
     var detail=p.motif==="terminee"&&p.journees?" · "+p.journees.length+" journée"+(p.journees.length>1?"s":"")+" · CA "+fmt(p.caEvenement||0)+(p.objectif?" sur "+fmt(p.objectif):"")
       :" (fond "+fmt(p.fondCaisse)+", objectif "+(p.objectif?fmt(p.objectif):"aucun")+")";
-    h+="<li>"+echapperHtml(p.evenement.nom)+" — "+motif+" le "+dateHeure(p.archiveeLe)+detail+"</li>";
+    h+="<li>"+echapperHtml(p.evenement.nom)+" — "+motif+" le "+dateHeure(p.archiveeLe)+detail
+      +(p.motif==="terminee"&&p.journees?"<button class='btn-bilan' onclick='voirBilanHistorique("+indice+")'>📊 Voir le bilan</button>":"")+"</li>";
   });
   el.innerHTML=h+"</ul>";
 }
@@ -3468,7 +3482,7 @@ function libelleJour(court){
   return (court?"J":"Jour ")+j+(n>1&&j<=n?"/"+n:"");
 }
 function peutCommencerJour(){var d=marcheOuvert()&&journeeMarche();return !!d&&d.date!==dateLocale();}
-function jourAOuvrir(){return peutCommencerJour()&&preparation.continuerLe!==dateLocale();}
+function jourAOuvrir(){return peutCommencerJour()&&(!!journeeMarche().cloture||preparation.continuerLe!==dateLocale());}
 function proposerJourSuivant(){if(!jourAOuvrir()||jourSuivantPropose===dateLocale())return;jourSuivantPropose=dateLocale();window.ouvrirModalJourSuivant();}
 function sessionNonVide(){return journeeNonVide(donneesJournee({tickets:tickets,autresVentes:autresVentes,sortiesCaisse:sortiesCaisse,donsTombola:donsTombola,gainsObjets:gainsObjets}));}
 // Bilan de la journée en cours : ventes non annulées, espèces et SumUp séparés, sorties, fond.
@@ -3495,7 +3509,10 @@ function rafraichirCaisse(){
   renderCaisse();renderAutres();renderDons();majBoutonPreparation();
   if(document.getElementById("prepPanel").classList.contains("open"))ouvrirFormulairePreparation();
 }
-function ouvrirModalMarche(h){document.getElementById("modalMarcheContenu").innerHTML=h;document.getElementById("modalMarche").classList.add("open");}
+function ouvrirModalMarche(h,large){
+  var c=document.getElementById("modalMarcheContenu");c.innerHTML=h;c.classList.toggle("modal-large",!!large);c.scrollTop=0;
+  document.getElementById("modalMarche").classList.add("open");
+}
 window.fermerModalMarche=function(){document.getElementById("modalMarche").classList.remove("open");};
 function champFond(n,valeur){
   return "<label class='marche-champ'><span>Fond de caisse du jour "+n+" (espèces de départ, hors chiffre d'affaires)</span><span class='cp-input-row'>"
@@ -3572,14 +3589,21 @@ window.ouvrirModalJourSuivant=function(){
   if(!peutCommencerJour()){showToast("La journée d'aujourd'hui est déjà ouverte");return;}
   var p=preparation,d=journeeMarche(),b=bilanJournee(),n=p.journees.length+1;
   var h="<div class='modal-reset-icon'>🌅</div><div class='modal-reset-title'>Nouvelle journée — "+echapperHtml(p.evenement.nom)+"</div>";
-  h+="<div class='marche-texte'>La journée du "+jourCourt(d.date)+" (jour "+d.numero+") est toujours ouverte : rien n'a été remis à zéro.</div>";
+  h+="<div class='marche-texte'>La journée du "+jourCourt(d.date)+" (jour "+d.numero+") "+(d.cloture?"est clôturée, pas encore archivée":"est toujours ouverte")+" : rien n'a été remis à zéro.</div>";
   h+=ligneMarche("Journée du "+jourCourt(d.date),b.ventes+" vente"+(b.ventes>1?"s":"")+" · "+fmt(b.ca));
   h+=ligneMarche("Stock restant","conservé pour le jour "+n);
   h+=ligneMarche("Objectif de l'événement",p.objectif?fmt(p.objectif):"aucun");
   h+=champFond(n,p.fondCaisse);
-  h+="<div class='marche-texte'>« Commencer le jour "+n+" » archive la journée du "+jourCourt(d.date)+" sur l'iPad (rien n'est perdu). « Continuer » ajoute les prochaines ventes à cette journée (marché tard le soir).</div>";
-  h+="<div class='marche-alerte'>À savoir : avec « Continuer », les ventes faites après minuit restent dans la journée de caisse du "+jourCourt(d.date)+", mais SHAYA MANAGER les compte à leur date réelle (date comptable du "+jourCourt(dateLocale())+"). Le chiffre d'affaires de l'événement ne change pas.</div>";
-  h+="<div class='modal-reset-btns'><button class='cancel' onclick='continuerJourneeMarche()'>Continuer le "+jourCourt(d.date)+"</button><button class='confirm' onclick='commencerJourSuivant()'>Commencer le jour "+n+"</button></div>";
+  if(d.cloture){
+    // Journée déjà clôturée : elle ne se poursuit pas ; le jour suivant se commence maintenant ou plus tard.
+    h+="<div class='marche-texte'>Clôture faite à "+heure(d.cloture.le)+", écart "+texteEcart(d.cloture.ecart)+". « Commencer le jour "+n+" » archive la journée du "+jourCourt(d.date)+" sur l'iPad (rien n'est perdu).</div>";
+    h+="<div class='modal-reset-btns'><button class='cancel' onclick='fermerModalMarche()'>Plus tard</button><button class='confirm' onclick='commencerJourSuivant()'>Commencer le jour "+n+"</button></div>";
+  }else{
+    h+="<div class='marche-alerte'>La journée du "+jourCourt(d.date)+" n'est pas clôturée : les espèces n'ont pas été comptées. <button class='cart-ajuster' onclick='ouvrirClotureJour()'>🧾 Clôturer d'abord</button></div>";
+    h+="<div class='marche-texte'>« Commencer le jour "+n+" » archive la journée du "+jourCourt(d.date)+" sur l'iPad (rien n'est perdu). « Continuer » ajoute les prochaines ventes à cette journée (marché tard le soir).</div>";
+    h+="<div class='marche-alerte'>À savoir : avec « Continuer », les ventes faites après minuit restent dans la journée de caisse du "+jourCourt(d.date)+", mais SHAYA MANAGER les compte à leur date réelle (date comptable du "+jourCourt(dateLocale())+"). Le chiffre d'affaires de l'événement ne change pas.</div>";
+    h+="<div class='modal-reset-btns'><button class='cancel' onclick='continuerJourneeMarche()'>Continuer le "+jourCourt(d.date)+"</button><button class='confirm' onclick='commencerJourSuivant()'>Commencer le jour "+n+"</button></div>";
+  }
   ouvrirModalMarche(h);
 };
 window.commencerJourSuivant=function(){
@@ -3589,7 +3613,7 @@ window.commencerJourSuivant=function(){
   var p=preparation,d=journeeMarche(),bilan=bilanJournee(),maintenant=new Date().toISOString();
   if(!archiverJourneeEnCours("marche-jour-suivant")
     &&!window.confirm("La journée en cours n'a pas pu être archivée sur cet appareil.\nAvez-vous exporté la journée en Excel ?\n\nOK : continuer quand même — Annuler : revenir"))return;
-  d.bilan=bilan;d.fermeeLe=maintenant;
+  d.bilan=bilan;d.produits=produitsJournee();d.fermeeLe=maintenant;
   viderJournee();fondCaisse=fond;
   p.journees.push({numero:p.journees.length+1,date:dateLocale(),ouverteLe:maintenant,fond:fond});
   delete p.continuerLe;
@@ -3599,6 +3623,7 @@ window.commencerJourSuivant=function(){
 };
 window.continuerJourneeMarche=function(){
   if(!marcheOuvert())return;
+  if(journeeCloturee()){showToast("Journée clôturée : elle ne se poursuit pas");return;}
   preparation.continuerLe=dateLocale();sauverPreparation();
   window.fermerModalMarche();majTableauMarche();
   showToast("Journée du "+jourCourt(journeeMarche().date)+" poursuivie ; SHAYA MANAGER datera les ventes d'aujourd'hui au "+jourCourt(dateLocale()));
@@ -3627,9 +3652,12 @@ window.demanderFinMarche=function(){
   h+=ligneMarche("Journées",String(p.journees.length));
   h+=ligneMarche("CA de l'événement",fmt(ca)+(p.objectif?" · "+pourcent(ca/p.objectif*100)+" de "+fmt(p.objectif):""));
   h+=ligneMarche("Journée en cours",b.ventes+" vente"+(b.ventes>1?"s":"")+" · "+fmt(b.ca));
+  var dj=journeeMarche();
+  h+=dj.cloture?ligneMarche("Clôture du jour "+dj.numero,"faite · écart "+texteEcart(dj.cloture.ecart))
+    :"<div class='marche-alerte'>Journée en cours non clôturée : les espèces n'ont pas été comptées. <button class='cart-ajuster' onclick='ouvrirClotureJour()'>🧾 Clôturer d'abord</button></div>";
   var mod=p.ouverture.modifies||{stock:{},masques:{}},nbMod=PRODUCTS.filter(function(x){return mod.stock[x.id]||mod.masques[x.id];}).length;
   h+=ligneMarche("Corrections faites pendant le marché",nbMod?nbMod+" produit"+(nbMod>1?"s":"")+" · conservées":"aucune");
-  h+="<div class='marche-texte'>La journée en cours est archivée sur l'iPad et le bilan du marché rejoint l'historique. Le stock restant des produits emportés est conservé, ainsi que toutes les corrections de stock et d'affichage faites pendant le marché ; les autres produits retrouvent leur stock et leur affichage d'avant l'ouverture. Le fond de caisse revient à 0. Le comptage des espèces et le bilan détaillé viendront avec la clôture (étape 5).</div>";
+  h+="<div class='marche-texte'>La journée en cours est archivée sur l'iPad et le bilan du marché rejoint l'historique. Le stock restant des produits emportés est conservé, ainsi que toutes les corrections de stock et d'affichage faites pendant le marché ; les autres produits retrouvent leur stock et leur affichage d'avant l'ouverture. Le fond de caisse revient à 0. Le bilan complet s'affiche ensuite, avec son export Excel, et reste consultable dans l'historique.</div>";
   h+="<div class='modal-reset-btns'><button class='cancel' onclick='fermerModalMarche()'>Annuler</button><button class='confirm' onclick='terminerMarche()'>🏁 Terminer</button></div>";
   ouvrirModalMarche(h);
 };
@@ -3638,8 +3666,14 @@ window.terminerMarche=function(){
   var p=preparation,d=journeeMarche(),bilan=bilanJournee(),maintenant=new Date().toISOString();
   if(!archiverJourneeEnCours("fin-marche")
     &&!window.confirm("La journée en cours n'a pas pu être archivée sur cet appareil.\nAvez-vous exporté la journée en Excel ?\n\nOK : terminer quand même — Annuler : revenir"))return;
-  d.bilan=bilan;d.fermeeLe=maintenant;
+  d.bilan=bilan;d.produits=produitsJournee();d.fermeeLe=maintenant;
   var ca=arrondi(p.journees.reduce(function(s,j){return s+(j.bilan?j.bilan.ca:0);},0));
+  // Stock restant en fin de marché (produits emportés ou vendus), gardé pour le bilan.
+  p.restants={};
+  PRODUCTS.forEach(function(x){
+    var vendu=p.journees.some(function(j){return (j.produits||[]).some(function(y){return String(y.id)===String(x.id);});});
+    if(p.quantites[x.id]>0||vendu)p.restants[x.id]=stockDe(x.id);
+  });
   // Produits emportés : stock restant (ventes et corrections comprises). Produits non emportés : stock d'avant
   // l'ouverture. Affichage d'avant l'ouverture. Une correction faite pendant le marché (stock ou affichage) est gardée.
   var a=p.ouverture.avant,mod=p.ouverture.modifies||{stock:{},masques:{}};
@@ -3653,6 +3687,177 @@ window.terminerMarche=function(){
   sauverPreparation();sauvegarder();
   window.fermerModalMarche();rafraichirCaisse();
   showToast("🏁 Marché terminé : bilan gardé dans l'historique");
+  window.voirBilanHistorique(historiquePreparations.length-1);
+};
+
+// ── CLÔTURE DE LA JOURNÉE ET BILAN DE L'ÉVÉNEMENT (SHAYA) ─────────────────────────────────────────
+// La clôture enregistre le comptage des espèces de la journée (théorique = fond + espèces − sorties ; le fond
+// n'entre jamais dans le chiffre d'affaires). Elle ne termine pas le marché, ne touche ni au stock ni aux
+// ventes, et ne change rien à la synchronisation avec SHAYA MANAGER.
+function produitsJournee(){
+  // Quantités vendues de la journée en cours (montants nets de remise, ventes annulées déduites).
+  var l=[];Object.keys(salesData).forEach(function(k){var s=salesData[k];if(s&&s.qty>0)l.push({id:isNaN(+k)?k:+k,nom:s.name,qte:s.qty,ca:arrondi(s.ca)});});
+  return l;
+}
+function releveJournee(){
+  var b=bilanJournee();b.annulees=tickets.length-ticketsEncaisses().length;b.autres=arrondi(b.ca-b.especes-b.sumup);
+  return {bilan:b,produits:produitsJournee()};
+}
+function journeeCloturee(){var d=marcheOuvert()&&journeeMarche();return !!(d&&d.cloture);}
+function bloqueSiCloturee(){
+  if(!journeeCloturee())return false;
+  showToast("Journée clôturée : rouvrez-la ou commencez la journée suivante (🗓️)");
+  if(!document.getElementById("prepPanel").classList.contains("open"))window.togglePreparation();
+  return true;
+}
+function classeEcart(e){return e>0.004?"excedent":e<-0.004?"manque":"juste";}
+function texteEcart(e){var c=classeEcart(e);return (c==="excedent"?"+":c==="manque"?"−":"")+fmt(Math.abs(e))+(c==="excedent"?" (excédent)":c==="manque"?" (manque)":" (juste)");}
+function periodeEvenement(e){return e&&e.debut?(e.fin&&e.fin!==e.debut?"du "+dateCourte(e.debut)+" au "+dateCourte(e.fin):dateCourte(e.debut)):"";}
+function quantiteTexte(q){return q===null||q===undefined?"—":stockIllimite(q)?"∞":String(q);}
+
+window.ouvrirClotureJour=function(){
+  if(!marcheOuvert())return;
+  var p=preparation,d=journeeMarche();
+  if(d.cloture){showToast("Journée déjà clôturée");return;}
+  var r=releveJournee(),b=r.bilan,theorique=arrondi(b.fond+b.especes-b.sorties);
+  var h="<div class='modal-reset-icon'>🧾</div><div class='modal-reset-title'>Clôture du jour "+d.numero+" — "+echapperHtml(p.evenement.nom)+"</div>";
+  h+="<div class='marche-texte'>"+jourCourt(d.date)+", ouverte à "+heure(d.ouverteLe)+". La clôture enregistre le comptage des espèces ; elle ne termine pas le marché et ne touche ni au stock ni aux ventes.</div>";
+  h+=ligneMarche("Ventes",b.ventes+(b.annulees?" (+ "+b.annulees+" annulée"+(b.annulees>1?"s":"")+")":""));
+  h+=ligneMarche("Chiffre d'affaires du jour",fmt(b.ca));
+  h+=ligneMarche("💵 dont espèces",fmt(b.especes));
+  h+=ligneMarche("📱 dont SumUp",fmt(b.sumup));
+  if(b.autres)h+=ligneMarche("dont autres moyens",fmt(b.autres));
+  h+=ligneMarche("Fond de caisse initial (hors chiffre d'affaires)",fmt(b.fond));
+  h+=ligneMarche("Sorties d'espèces"+(sortiesCaisse.length?" ("+sortiesCaisse.length+")":""),"− "+fmt(b.sorties));
+  h+=ligneMarche("Espèces théoriques en caisse",fmt(theorique));
+  h+="<label class='marche-champ'><span>Montant réellement compté</span><span class='cp-input-row'><input class='cp-input' id='clotureCompte' type='text' inputmode='decimal' autocomplete='off' placeholder='"+texteMontant(theorique)+"' oninput='majEcartCloture("+theorique+")'><span class='prep-unite'>€</span></span></label>";
+  h+="<div class='marche-ligne'><span>Écart (compté − théorique)</span><strong class='cloture-ecart' id='clotureEcart'>—</strong></div>";
+  h+="<label class='marche-champ'><span>Commentaire (facultatif, par exemple la raison d'un écart)</span><input class='cp-input cloture-note' id='clotureNote' type='text' maxlength='200' autocomplete='off'></label>";
+  if(r.produits.length){
+    var qte=r.produits.reduce(function(s,x){return s+x.qte;},0);
+    h+="<details class='prep-historique'><summary>Quantités vendues du jour ("+qte+" article"+(qte>1?"s":"")+")</summary><ul>"
+      +r.produits.map(function(x){return "<li>"+echapperHtml(x.nom)+" : "+x.qte+" · "+fmt(x.ca)+"</li>";}).join("")+"</ul></details>";
+  }
+  h+="<div class='modal-reset-btns'><button class='cancel' onclick='fermerModalMarche()'>Annuler</button><button class='confirm' onclick='cloturerJournee()'>🧾 Clôturer la journée</button></div>";
+  ouvrirModalMarche(h);
+};
+window.majEcartCloture=function(theorique){
+  var el=document.getElementById("clotureEcart");if(!el)return;
+  var brut=String(document.getElementById("clotureCompte").value||"").trim(),compte=lireMontant("clotureCompte");
+  if(!brut||compte===null){el.textContent="—";el.className="cloture-ecart";return;}
+  var e=arrondi(compte-theorique);el.textContent=texteEcart(e);el.className="cloture-ecart "+classeEcart(e);
+};
+window.cloturerJournee=function(){
+  if(!marcheOuvert()){window.fermerModalMarche();return;}
+  var d=journeeMarche();if(d.cloture){window.fermerModalMarche();return;}
+  var brut=String(document.getElementById("clotureCompte").value||"").trim(),compte=lireMontant("clotureCompte");
+  if(!brut||compte===null){showToast("Saisissez le montant réellement compté (exemple : 245,50)");return;}
+  var r=releveJournee(),b=r.bilan,theorique=arrondi(b.fond+b.especes-b.sorties);
+  d.cloture={le:new Date().toISOString(),theorique:theorique,compte:compte,ecart:arrondi(compte-theorique),
+    note:String(document.getElementById("clotureNote").value||"").trim().slice(0,200),bilan:b,produits:r.produits};
+  var ok=sauverPreparation();
+  window.fermerModalMarche();rafraichirCaisse();
+  showToast(ok?"🧾 Jour "+d.numero+" clôturé · écart "+texteEcart(d.cloture.ecart):"⚠️ Clôture faite, mais la copie locale a échoué");
+};
+window.rouvrirJournee=function(){
+  if(!journeeCloturee())return;
+  var d=journeeMarche();
+  if(!window.confirm("Rouvrir la journée du "+jourCourt(d.date)+" ?\nLe comptage enregistré est gardé dans l'historique de la journée ; il faudra clôturer à nouveau."))return;
+  (d.cloturesAnnulees||(d.cloturesAnnulees=[])).push(Object.assign({},d.cloture,{annuleeLe:new Date().toISOString()}));
+  delete d.cloture;
+  sauverPreparation();rafraichirCaisse();
+  showToast("Journée rouverte : ventes de nouveau possibles");
+};
+
+// Bilan d'un marché, en cours (journée en cours lue en direct) ou terminé (tel qu'enregistré à sa fin).
+function calculerBilan(p,enCours){
+  var dernier=p.journees.length-1,releve=enCours?releveJournee():null;
+  var jours=p.journees.map(function(j,i){
+    var vivant=!!(enCours&&i===dernier&&!j.bilan);
+    return {numero:j.numero,date:j.date,cloture:j.cloture||null,enCours:vivant,
+      b:vivant?releve.bilan:(j.bilan||(j.cloture&&j.cloture.bilan)||null),
+      produits:vivant?releve.produits:(j.produits||(j.cloture&&j.cloture.produits)||null)};
+  });
+  // Journée avec des ventes mais sans quantités enregistrées (marché terminé avant la clôture détaillée).
+  var quantitesConnues=jours.every(function(j){return !!j.produits||!j.b||!j.b.ventes;});
+  jours.forEach(function(j){if(!j.produits)j.produits=[];});
+  var t={ventes:0,ca:0,especes:0,sumup:0,sorties:0,ecart:0,clotures:0};
+  jours.forEach(function(j){
+    if(j.b){t.ventes+=j.b.ventes;t.ca+=j.b.ca;t.especes+=j.b.especes;t.sumup+=j.b.sumup;t.sorties+=j.b.sorties;}
+    if(j.cloture){t.ecart+=j.cloture.ecart;t.clotures++;}
+  });
+  ["ca","especes","sumup","sorties","ecart"].forEach(function(k){t[k]=arrondi(t[k]);});
+  var ventes={};
+  jours.forEach(function(j){j.produits.forEach(function(x){var k=String(x.id),v=ventes[k]||(ventes[k]={nom:x.nom,vendu:0,ca:0});v.vendu+=x.qte;v.ca=arrondi(v.ca+x.ca);});});
+  var ids={};
+  Object.keys(p.quantites||{}).forEach(function(k){if(p.quantites[k]>0)ids[k]=true;});
+  Object.keys(ventes).forEach(function(k){ids[k]=true;});
+  var produits=Object.keys(ids).map(function(k){
+    var x=PRODUCTS.find(function(y){return String(y.id)===k;});
+    var restant=enCours?(x?stockDe(x.id):null):(p.restants&&p.restants[k]!==undefined?p.restants[k]:null);
+    return {nom:x?x.label:(ventes[k]?ventes[k].nom:k),emporte:p.quantites&&p.quantites[k]||0,vendu:ventes[k]?ventes[k].vendu:0,ca:ventes[k]?ventes[k].ca:0,restant:restant};
+  });
+  produits.sort(function(a,b){return b.ca-a.ca||a.nom.localeCompare(b.nom);});
+  return {jours:jours,t:t,produits:produits,quantitesConnues:quantitesConnues};
+}
+function htmlBilan(p,enCours,indice){
+  var B=calculerBilan(p,enCours),e=p.evenement,t=B.t;
+  var kpi=function(l,v,s){return "<div class='marche-kpi'><div class='marche-kpi-lbl'>"+l+"</div><div class='marche-kpi-val'>"+v+"</div>"+(s?"<div class='marche-kpi-sous'>"+s+"</div>":"")+"</div>";};
+  var h="<div class='modal-reset-icon'>📊</div><div class='modal-reset-title'>Bilan — "+echapperHtml(e.nom)+"</div>";
+  h+="<div class='marche-texte'>"+[TYPES_EVENEMENT[e.type]||null,e.lieu?echapperHtml(e.lieu):null,periodeEvenement(e)].filter(Boolean).join(" · ")+"<br>"
+    +(enCours?"Marché en cours : bilan provisoire.":"Marché terminé le "+dateHeure(p.archiveeLe)+".")+(e.fictif?" Marché fictif (démonstration).":"")+"</div>";
+  h+="<div class='marche-grille trois'>"+kpi("CA de l'événement",fmt(t.ca),t.ventes+" vente"+(t.ventes>1?"s":""))
+    +kpi("Objectif",p.objectif?fmt(p.objectif):"aucun",p.objectif?pourcent(t.ca/p.objectif*100)+" atteint":"")
+    +kpi("💵 Espèces",fmt(t.especes))+kpi("📱 SumUp",fmt(t.sumup))+kpi("Sorties d'espèces",fmt(t.sorties))
+    +kpi("Écart de caisse",t.clotures?texteEcart(t.ecart):"—",t.clotures+"/"+B.jours.length+" journée"+(B.jours.length>1?"s":"")+" clôturée"+(t.clotures>1?"s":""))+"</div>";
+  h+="<div class='cp-section-title'>Journées</div><div class='bilan-tableau-wrap'><table class='bilan-tableau'><thead><tr><th>Jour</th><th>Ventes</th><th>CA</th><th>Espèces</th><th>SumUp</th><th>Fond</th><th>Sorties</th><th>Théorique</th><th>Compté</th><th>Écart</th></tr></thead><tbody>";
+  B.jours.forEach(function(j){
+    var b=j.b||{},c=j.cloture;
+    h+="<tr><td>J"+j.numero+" · "+jourCourt(j.date)+(j.enCours?" (en cours)":"")+"</td><td>"+(b.ventes||0)+"</td><td>"+fmt(b.ca||0)+"</td><td>"+fmt(b.especes||0)+"</td><td>"+fmt(b.sumup||0)+"</td><td>"+fmt(b.fond||0)+"</td><td>"+fmt(b.sorties||0)+"</td>"
+      +"<td>"+(c?fmt(c.theorique):"—")+"</td><td>"+(c?fmt(c.compte):"—")+"</td><td class='"+(c?"cloture-ecart "+classeEcart(c.ecart):"")+"'>"+(c?texteEcart(c.ecart).replace(/ \(.*\)$/,""):"non clôturée")+"</td></tr>";
+  });
+  h+="</tbody></table></div>";
+  var notes=B.jours.filter(function(j){return j.cloture&&j.cloture.note;});
+  if(notes.length)h+="<div class='marche-texte'>"+notes.map(function(j){return "Jour "+j.numero+" : "+echapperHtml(j.cloture.note);}).join("<br>")+"</div>";
+  h+="<div class='cp-section-title'>Produits</div><div class='bilan-tableau-wrap'><table class='bilan-tableau'><thead><tr><th>Produit</th><th>Emporté</th><th>Vendu</th><th>Restant</th><th>CA</th></tr></thead><tbody>";
+  B.produits.forEach(function(x){h+="<tr><td>"+echapperHtml(x.nom)+"</td><td>"+quantiteTexte(x.emporte)+"</td><td>"+(B.quantitesConnues?x.vendu:"—")+"</td><td>"+quantiteTexte(x.restant)+"</td><td>"+(B.quantitesConnues?fmt(x.ca):"—")+"</td></tr>";});
+  if(!B.produits.length)h+="<tr><td colspan='5'>Aucun produit</td></tr>";
+  h+="</tbody></table></div>";
+  if(!B.quantitesConnues)h+="<div class='marche-texte'>Quantités vendues par produit non enregistrées pour ce marché (terminé avant la clôture détaillée) : le chiffre d'affaires total reste exact.</div>";
+  h+="<div class='marche-texte'>Le fond de caisse n'est jamais compté dans le chiffre d'affaires. Restant : stock "+(enCours?"actuel":"à la fin du marché")+", corrections comprises.</div>";
+  h+="<div class='modal-reset-btns'><button class='cancel' onclick='fermerModalMarche()'>Fermer</button><button class='confirm' onclick='exporterBilan("+(indice===null?"null":indice)+")'>⬇ Export Excel</button></div>";
+  return h;
+}
+window.voirBilanMarche=function(){if(marcheOuvert())ouvrirModalMarche(htmlBilan(preparation,true,null),true);};
+window.voirBilanHistorique=function(i){
+  var p=historiquePreparations[i];
+  if(!p||p.motif!=="terminee"||!p.journees){showToast("Bilan introuvable");return;}
+  ouvrirModalMarche(htmlBilan(p,false,i),true);
+};
+// Export Excel du bilan (bibliothèque déjà chargée par la caisse, gardée hors ligne).
+window.exporterBilan=function(i){
+  var enCours=i===null||i===undefined,p=enCours?preparation:historiquePreparations[i];
+  if(!p||!p.journees){showToast("Bilan introuvable");return;}
+  if(typeof XLSX==="undefined"){showToast("Export Excel indisponible : bibliothèque non chargée");return;}
+  var B=calculerBilan(p,enCours&&marcheOuvert()),e=p.evenement,t=B.t,wb=XLSX.utils.book_new();
+  var a1=[[(DEMO?"DÉMONSTRATION (ventes fictives) — ":"")+"BILAN — "+e.nom],["Les projets de Shaya"],[],
+    ["Événement",e.nom],["Type",TYPES_EVENEMENT[e.type]||""],["Lieu",e.lieu||""],["Dates",periodeEvenement(e)],["Identifiant SHAYA MANAGER",e.id||"(marché fictif)"],
+    ["État",enCours?"En cours (bilan provisoire)":"Terminé le "+dateHeure(p.archiveeLe)],[],
+    ["Chiffre d'affaires total",t.ca],["dont espèces",t.especes],["dont SumUp",t.sumup],["Ventes",t.ventes],
+    ["Objectif",p.objectif||""],["Objectif atteint (%)",p.objectif?Number((t.ca/p.objectif*100).toFixed(1)):""],
+    ["Sorties d'espèces",t.sorties],["Écart de caisse (journées clôturées)",t.clotures?t.ecart:""],["Journées clôturées",t.clotures+" / "+B.jours.length],[],
+    ["Le fond de caisse n'est jamais compté dans le chiffre d'affaires."]];
+  var a2=[["Jour","Date","Ventes","CA","Espèces","SumUp","Fond de caisse","Sorties","Espèces théoriques","Compté","Écart","Commentaire","Clôturée le"]];
+  B.jours.forEach(function(j){var b=j.b||{},c=j.cloture;a2.push(["J"+j.numero,j.date,b.ventes||0,b.ca||0,b.especes||0,b.sumup||0,b.fond||0,b.sorties||0,c?c.theorique:"",c?c.compte:"",c?c.ecart:"",c?c.note||"":(j.enCours?"en cours":"non clôturée"),c?dateHeure(c.le):""]);});
+  var a3=[["Produit","Emporté","Vendu","Restant","CA"]];
+  B.produits.forEach(function(x){a3.push([x.nom,stockIllimite(x.emporte)?"Illimité":x.emporte,B.quantitesConnues?x.vendu:"",x.restant===null?"":stockIllimite(x.restant)?"Illimité":x.restant,B.quantitesConnues?x.ca:""]);});
+  if(!B.quantitesConnues)a3.push([],["Quantités vendues non enregistrées pour ce marché (terminé avant la clôture détaillée)."]);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a1),"Bilan");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a2),"Journees");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a3),"Produits");
+  var nom=String(e.nom||"marche").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,40);
+  XLSX.writeFile(wb,(DEMO?"DEMONSTRATION_":"")+"bilan_"+nom+"_"+dateLocale()+".xlsx");
+  showToast("⬇ Bilan exporté en Excel");
 };
 
 // Tableau du marché (panneau 🗓️ quand un marché est ouvert).
@@ -3662,7 +3867,8 @@ function renderMarche(){
   var kpi=function(l,v,s){return "<div class='marche-kpi'><div class='marche-kpi-lbl'>"+l+"</div><div class='marche-kpi-val'>"+v+"</div>"+(s?"<div class='marche-kpi-sous'>"+s+"</div>":"")+"</div>";};
   var h="<div class='marche-entete'><strong>"+echapperHtml(e.nom)+"</strong><span>"+libelleJour()+" · "+jourCourt(d.date)+" · ouverte à "+heure(d.ouverteLe)+"</span>";
   h+="<span>"+(e.fictif?"Marché fictif (démonstration) : ventes sans événement SHAYA MANAGER":"Ventes rattachées à l'événement SHAYA MANAGER")+"</span></div>";
-  if(peutCommencerJour())h+="<div class='marche-alerte'>La journée du "+jourCourt(d.date)+" est toujours ouverte (rien n'a été remis à zéro). Les ventes d'aujourd'hui s'y ajoutent, mais SHAYA MANAGER les compte à leur date réelle (date comptable du "+jourCourt(dateLocale())+"). Touchez « Commencer la journée suivante » quand vous êtes prêt.</div>";
+  if(peutCommencerJour()&&!d.cloture)h+="<div class='marche-alerte'>La journée du "+jourCourt(d.date)+" est toujours ouverte (rien n'a été remis à zéro). Les ventes d'aujourd'hui s'y ajoutent, mais SHAYA MANAGER les compte à leur date réelle (date comptable du "+jourCourt(dateLocale())+"). Touchez « Commencer la journée suivante » quand vous êtes prêt.</div>";
+  if(d.cloture)h+="<div class='marche-alerte'>Journée clôturée à "+heure(d.cloture.le)+" : "+fmt(d.cloture.compte)+" comptés pour "+fmt(d.cloture.theorique)+" théoriques, écart "+texteEcart(d.cloture.ecart)+". Ventes bloquées jusqu'à la journée suivante ; « Rouvrir la journée » pour corriger.</div>";
   h+="<div class='marche-grille'>"+kpi("CA du jour",fmt(b.ca),b.ventes+" vente"+(b.ventes>1?"s":""))+kpi("CA de l'événement",fmt(caEv),p.journees.length+" journée"+(p.journees.length>1?"s":""))
     +kpi("💵 Espèces (jour)",fmt(b.especes))+kpi("📱 SumUp (jour)",fmt(b.sumup))+"</div>";
   h+=kpi("Solde théorique des espèces",fmt(solde),"Fond "+fmt(fondCaisse)+" + espèces "+fmt(b.especes)+" − sorties "+fmt(b.sorties));
@@ -3672,7 +3878,8 @@ function renderMarche(){
       +"<div class='marche-kpi-sous'>"+fmt(caEv)+" sur "+fmt(p.objectif)+" · "+pourcent(pct)+"</div></div>";
   }else h+=kpi("Objectif de l'événement","aucun");
   h+="<div><div class='cp-section-title'>Journées</div>"+p.journees.map(function(j){
-    return ligneMarche("Jour "+j.numero+" · "+jourCourt(j.date),j.bilan?fmt(j.bilan.ca)+" · "+j.bilan.ventes+" vente"+(j.bilan.ventes>1?"s":""):"en cours");
+    var jb=j.bilan||(j.cloture&&j.cloture.bilan),etat=j.cloture?"clôturée · écart "+texteEcart(j.cloture.ecart):j.bilan?"non clôturée":"en cours";
+    return ligneMarche("Jour "+j.numero+" · "+jourCourt(j.date),(jb?fmt(jb.ca)+" · "+jb.ventes+" vente"+(jb.ventes>1?"s":"")+" · ":"")+etat);
   }).join("")+"</div>";
   el.innerHTML=h;
 }
@@ -3682,6 +3889,9 @@ function majBoutonsPanneau(){
   cache("prepEnregistrer",ouvert);
   cache("prepAbandonner",ouvert||!preparation);
   cache("marcheJourSuivant",!peutCommencerJour());
+  cache("marcheCloturer",!ouvert||journeeCloturee());
+  cache("marcheRouvrir",!journeeCloturee());
+  cache("marcheBilan",!ouvert);
   cache("marcheAnnuler",!ouvert||sessionNonVide()||!preparation||preparation.journees.length>1);
   cache("marcheTerminer",!ouvert);
 }
@@ -3832,10 +4042,12 @@ function updateObjectifBar(){
 }
 
 window.setFondCaisse=function(){
+  if(bloqueSiCloturee())return;
   var raw=(document.getElementById("cpFond").value||"").replace(",",".");var val=parseFloat(raw)||0;
   fondCaisse=val;if(marcheOuvert()&&journeeMarche()){journeeMarche().fond=val;sauverPreparation();}document.getElementById("cpFond").value=val;updateSoldeCaisse();renderCaisse();sauvegarder();showToast("Fond: "+fmt(val));
 };
 window.addSortie=function(){
+  if(bloqueSiCloturee())return;
   var label=document.getElementById("cpSortieLabel").value.trim();
   var raw=(document.getElementById("cpSortieMontant").value||"").replace(",",".");var montant=parseFloat(raw)||0;
   if(!label){showToast("Entrez un motif");return;}if(montant<=0){showToast("Entrez un montant");return;}
@@ -3845,6 +4057,7 @@ window.addSortie=function(){
   updateSoldeCaisse();renderCaisse();sauvegarder();showToast("Sortie: -"+fmt(montant));
 };
 window.deleteSortie=function(idx){
+  if(bloqueSiCloturee())return;
   var s=sortiesCaisse[idx];if(!s)return;
   if(!window.confirm("Supprimer la sortie de caisse « "+s.label+" » ("+fmt(s.montant)+") ?\nLe solde des espèces sera recalculé."))return;
   sortiesCaisse.splice(idx,1);updateSoldeCaisse();renderCaisse();sauvegarder();

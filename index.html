@@ -39,7 +39,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Démo caisse Shaya">
-<meta name="theme-color" content="#1A1A2E">
+<meta name="theme-color" content="#f5a623">
 <link rel="apple-touch-icon" href="images/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -495,9 +495,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .bilan-tableau td.note{white-space:normal;min-width:140px}
 .btn-bilan{margin-left:6px;padding:2px 10px;border:1px solid var(--border2);border-radius:99px;background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
 /* Caisse ouverte depuis l'écran d'accueil de l'iPad (« black-translucent ») : la page passe sous l'heure et la
-   batterie. Bordures couleur du fond plutôt que marges, pour que les panneaux latéraux commencent eux aussi
-   sous la barre d'état. Valeurs nulles dans Safari et sur PC. */
-body{border-top:env(safe-area-inset-top,0px) solid var(--bg);border-bottom:env(safe-area-inset-bottom,0px) solid var(--bg)}
+   batterie. Bordures plutôt que marges, pour que les panneaux latéraux commencent eux aussi sous la barre d'état.
+   Valeurs nulles dans Safari et sur PC. En haut, couleur de la barre du haut (orange du bandeau en démonstration),
+   comme theme-color et le fond de html : iPadOS reprend ces couleurs pour la bande qu'il dessine lui-même sous
+   l'heure et la batterie (applications de l'écran d'accueil, depuis iPadOS 26.1). */
+body{border-top:env(safe-area-inset-top,0px) solid var(--surface);border-bottom:env(safe-area-inset-bottom,0px) solid var(--bg)}
+body.mode-demo{border-top-color:#f5a623}
+html{background:var(--surface)}
+html:has(body.mode-demo){background:#f5a623}
+/* Panneaux de droite (Promotions, Dons, Tickets) rangés hors de l'écran, à droite : sans règle sur html, le
+   « overflow:hidden » du body passait à la fenêtre et la page pouvait glisser de leur largeur. Le body découpe
+   désormais lui-même (« clip » : jamais défilable ; « hidden » sur les iPadOS qui ne connaissent pas « clip »). */
+html{overflow:hidden}
+body{overflow:hidden;overflow:clip}
 /* ── TABLETTE (iPad) : cases tactiles de 44 px au moins, rien de masqué ni d'écrasé ─────────────────── */
 @media (max-width:1366px),(pointer:coarse){
   html{touch-action:manipulation} /* deux touchers rapides sur un produit = deux articles, jamais un zoom */
